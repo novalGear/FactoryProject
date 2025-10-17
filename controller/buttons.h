@@ -2,4 +2,9 @@
 
 void buttons_setup();
 void buttons_update();
-bool is_pressed(const int button_index);
+
+bool check_button_event();
+int get_pressedButtonIndex();
+int get_pressedButtonType();
+
+void reset_ButtonEvent();

@@ -8,16 +8,18 @@ void setup() {
     buttons_setup();
     OLED_screen_setup();
     temp_sensors_setup();
+    co2_sensor_setup();
 }
 
 void loop() {
-
     buttons_update();
-    for (int i = 0; i < 4; i++) {
-        if (is_pressed(i)) {
-            Serial.printf("Button %d pressed\n", i);
-        }
-    }
-
     temperature_sensors_update();
+    co2_sensor_update();
+
+    if (check_button_event()) {
+        String msg = "button " + String (get_pressedButtonIndex()) + " down";
+        Serial.println(msg);
+        // menu(get_pressedButtonIndex());
+        reset_ButtonEvent();
+    }
 }
