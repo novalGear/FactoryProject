@@ -5,8 +5,10 @@
 
 // =============== Константы ===============
 
-const int TEMP_INTERVAL   = 2000;   // интервал между запросами измерения (мс)
-const int TEMP_READ_DELAY = 1000;   // задержка перед чтением температуры (мс) — датчикам нужно ~750 мс
+const int TEMP_INTERVAL   = 10000;  // интервал между запросами измерения (мс)
+const int TEMP_READ_DELAY = 1000;   // задержка перед чтением температуры (мс) — датчикам нужно ~750 мс на 12 битах
+
+const int RESOLUTION_BITS = 10;     // устанавливаем точность измерения в битах (12 максимум)
 
 const int SENSORS_COUNT = 3;    // общее количество датчиков
 
@@ -19,7 +21,7 @@ OneWire* oneWires[SENSORS_COUNT];
 
 struct TempSensor {
     int pin;
-    DallasTemperature* sensor;      
+    DallasTemperature* sensor;
     float last_tempC;
     bool error;
 };
@@ -34,14 +36,16 @@ void temp_sensors_setup() {
     for (int i = 0; i < SENSORS_COUNT; i++) {
         pinMode(temp_sensors[i].pin, INPUT_PULLUP);
         oneWires[i] = new OneWire(temp_sensors[i].pin);
-        temp_sensors[i].sensor = new DallasTemperature(oneWires[i]); 
+        temp_sensors[i].sensor = new DallasTemperature(oneWires[i]);
         temp_sensors[i].sensor->begin();
+        temp_sensors[i].sensor->setResolution(RESOLUTION_BITS);
     }
 }
 
 void temp_request() {
     for (int i = 0; i < SENSORS_COUNT; i++) {
-        temp_sensors[i].sensor->requestTemperatures(); 
+        temp_sensors[i].sensor->setWaitForConversion(false);
+        temp_sensors[i].sensor->requestTemperatures();
     }
 }
 
@@ -71,24 +75,24 @@ void read_and_display_temp() {
 }
 
 void temperature_sensors_update() {
-    static TempState temp_state = STATE_WAITING_FOR_READ;      // Состояние машины
-    static unsigned long lastTempAction = 0;                   // Время последнего действия
+    static TempState temp_state = STATE_WAITING_FOR_READ;
+    static unsigned long lastTempAction = 0;
 
     unsigned long now = millis();
 
     switch (temp_state) {
         case STATE_WAITING_FOR_READ:
             if (now - lastTempAction >= TEMP_READ_DELAY) {
-                read_and_display_temp();                       // Читаем и выводим
-                temp_state = STATE_WAITING_FOR_REQUEST;        // Переход в следующее состояние
+                read_and_display_temp();
+                temp_state = STATE_WAITING_FOR_REQUEST;
             }
             break;
 
         case STATE_WAITING_FOR_REQUEST:
             if (now - lastTempAction >= TEMP_INTERVAL) {
-                temp_request();                                // Запрашиваем новое измерение
-                lastTempAction = now;                          // Обновляем время
-                temp_state = STATE_WAITING_FOR_READ;           // Возвращаемся к чтению
+                temp_request();
+                lastTempAction = now;
+                temp_state = STATE_WAITING_FOR_READ;
             }
             break;
     }

@@ -4,7 +4,7 @@
 const int BUTTON_PINS[] = {13, 12, 14, 27};
 const int NUM_BUTTONS = sizeof(BUTTON_PINS) / sizeof(BUTTON_PINS[0]);
 
-bool buttonEventOccurred = false; // 
+bool buttonEventOccurred = false; //
 int pressedButtonIndex = -1; // Номер кнопки (-1 = нет события)
 int pressedButtonType = 0;   // Тип события (например, 1 = click, 2 = double-click, 3 = press)
 
@@ -21,7 +21,7 @@ OneButton* buttons[NUM_BUTTONS];
 void handleButton0Click() {
     if (!buttonEventOccurred) {
         buttonEventOccurred = true;
-        pressedButtonIndex = 0; 
+        pressedButtonIndex = 0;
         pressedButtonType = EVENT_CLICK;
     }
 }
@@ -69,7 +69,7 @@ void buttons_setup() {
 }
 void buttons_update() {
     for (int i = 0; i < NUM_BUTTONS; i++) {
-        buttons[i]->tick(); 
+        buttons[i]->tick();
     }
 }
 
@@ -86,7 +86,7 @@ int get_pressedButtonType() {
 }
 
 void reset_ButtonEvent() {
-    buttonEventOccurred = false; 
-    pressedButtonIndex = -1; 
-    pressedButtonType = EVENT_NONE;   
+    buttonEventOccurred = false;
+    pressedButtonIndex = -1;
+    pressedButtonType = EVENT_NONE;
 }
