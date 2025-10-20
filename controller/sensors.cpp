@@ -1,7 +1,11 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <HardwareSerial.h>
+#include <assert.h>
 #include "OLED_screen.h"
+#include "sensors.h"
+
+extern const int SENSORS_COUNT;
 
 // =============== Константы ===============
 
@@ -9,8 +13,6 @@ const int TEMP_INTERVAL   = 10000;  // интервал между запрос�
 const int TEMP_READ_DELAY = 1000;   // задержка перед чтением температуры (мс) — датчикам нужно ~750 мс на 12 битах
 
 const int RESOLUTION_BITS = 10;     // устанавливаем точность измерения в битах (12 максимум)
-
-const int SENSORS_COUNT = 3;    // общее количество датчиков
 
 enum TempState {
     STATE_WAITING_FOR_READ,     // ждём, когда можно прочитать
@@ -64,15 +66,15 @@ void temp_sensors_read() {
         }
     }
 }
-
-void read_and_display_temp() {
-    temp_sensors_read();
-
-    for (int i = 0; i < SENSORS_COUNT; i++) {
-        display_temperature(i, temp_sensors[i].last_tempC);
-        display_temp_err(i, temp_sensors[i].error);
-    }
-}
+//
+// void read_and_display_temp() {
+//     temp_sensors_read();
+//
+//     for (int i = 0; i < SENSORS_COUNT; i++) {
+//         display_temperature(i, temp_sensors[i].last_tempC);
+//         display_temp_err(i, temp_sensors[i].error);
+//     }
+// }
 
 void temperature_sensors_update() {
     static TempState temp_state = STATE_WAITING_FOR_READ;
@@ -83,7 +85,7 @@ void temperature_sensors_update() {
     switch (temp_state) {
         case STATE_WAITING_FOR_READ:
             if (now - lastTempAction >= TEMP_READ_DELAY) {
-                read_and_display_temp();
+                temp_sensors_read();
                 temp_state = STATE_WAITING_FOR_REQUEST;
             }
             break;
@@ -96,6 +98,18 @@ void temperature_sensors_update() {
             }
             break;
     }
+}
+
+float get_sensor_recent_temp(int sensor_ind) {
+    assert(sensor_ind < SENSORS_COUNT && sensor_ind > 0);
+    if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
+    return temp_sensors[sensor_ind].last_tempC;
+}
+
+bool get_sensor_error(int sensor_ind) {
+    assert(sensor_ind < SENSORS_COUNT && sensor_ind > 0);
+    if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
+    return temp_sensors[sensor_ind].error;
 }
 
 // CO2 sensor =================================================================================================================== //
@@ -221,6 +235,10 @@ void co2_sensor_update() {
 // --- Функция для получения последнего значения ---
 int get_last_co2_ppm() {
     return last_co2_ppm;
+}
+
+int get_optimal_co2_ppm() {
+    return co2_optimal;
 }
 
 bool get_co2_read_error() {

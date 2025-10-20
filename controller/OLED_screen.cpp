@@ -2,11 +2,15 @@
 #include <Adafruit_SSD1306.h>
 #include <Wire.h>
 
+#include "sensors.h"
+
+extern const int SENSORS_COUNT;
+
 struct rect {
     int x;
     int y;
     int width;
-    int height;    
+    int height;
 };
 
 const int DIGIT_WIDTH  = 6;
@@ -57,13 +61,13 @@ void handleMenu(int button_index) {
     Serial.println(msg);
 }
 
-void display_update() {
+void display_regular_update() {
     static unsigned long last_upd_ms = 0;
     unsigned long now = millis();
     if (now - last_upd_ms > DISPLAY_UPD_PERIOD_MS) {
         display.display();
         last_upd_ms = now;
-    } 
+    }
 }
 
 void prepare_rect(const struct rect* Rect) {
@@ -71,41 +75,35 @@ void prepare_rect(const struct rect* Rect) {
     display.fillRect(Rect->x, Rect->y, Rect->width, Rect->height, SSD1306_BLACK);
 }
 
-// void OLED_screen_setup() {
-//     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-//         Serial.println("OLED не найден или не отвечает!");
-//         while(1); // Остановка, если дисплей не обнаружен
-//     }
-
-//     display.clearDisplay();
-//     // Настройка текста
-//     display.setTextSize(1);
-//     display.setTextColor(SSD1306_WHITE);
-//     // display.display();
-// }
-
-void display_temperature(const int sensor_ind, const float temperatureC) {
-    prepare_rect(&TEMP_DATA[sensor_ind]);
-    display.print(temperatureC);
-    display.println(" C");
-}
-
-void display_temp_err(const int sensor_ind, bool error) {
-    prepare_rect(&TEMP_ERROR[sensor_ind]);
-    String msg;
-    if (!error) {
-        msg = " valid";
-    } else {
-        msg = " lost";
+void display_temperature() {
+    for (int sensor_ind = 0; sensor_ind < SENSORS_COUNT; sensor_ind++) {
+        float temperatureC = get_sensor_recent_temp(sensor_ind);
+        prepare_rect(&TEMP_DATA[sensor_ind]);
+        display.print(temperatureC);
+        display.println(" C");
     }
-    display.println(msg);
-    // display.display();
 }
 
-void display_CO2(const int co2, const int co2_optimal) {
+void display_temp_err() {
+    for (int sensor_ind = 0; sensor_ind < SENSORS_COUNT; sensor_ind++) {
+        bool error = get_sensor_error(sensor_ind);
+        prepare_rect(&TEMP_ERROR[sensor_ind]);
+        String msg;
+        if (!error) {
+            msg = " valid";
+        } else {
+            msg = " lost";
+        }
+        display.println(msg);
+    }
+}
+
+void display_CO2() {
+    int co2 = get_last_co2_ppm();
+    int co2_optimal = get_optimal_co2_ppm();
+
     prepare_rect(&CO2_DATA);
 
     String msg = "CO2:" + String(co2) + "ppm" + "(" + String((int)round((float)co2 / co2_optimal * 100)) +"%)";
     display.println(msg);
-    // display.display();
 }
