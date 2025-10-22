@@ -4,6 +4,8 @@
 
 #include "sensors.h"
 
+#define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+
 extern const int SENSORS_COUNT;
 
 struct rect {
@@ -20,6 +22,16 @@ const int SCREEN_WIDTH  = 128;
 const int SCREEN_HEIGHT = 64;
 
 const unsigned long DISPLAY_UPD_PERIOD_MS = 100;
+
+const unsigned int STRINGS_IN_SCREEN = 5;
+
+struct rect screen[] = {
+    {.x = 0, .y = DIGIT_HEIGHT * 0, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT},
+    {.x = 0, .y = DIGIT_HEIGHT * 1, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT},
+    {.x = 0, .y = DIGIT_HEIGHT * 2, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT},
+    {.x = 0, .y = DIGIT_HEIGHT * 3, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT},
+    {.x = 0, .y = DIGIT_HEIGHT * 4, .width = SCREEN_WIDTH, .height = SCREEN_HEIGHT}
+};
 
 const struct rect TEMP_DATA[] = {
     {0, DIGIT_HEIGHT * 1, 7 * DIGIT_WIDTH, DIGIT_HEIGHT},
@@ -75,7 +87,23 @@ void prepare_rect(const struct rect* Rect) {
     display.fillRect(Rect->x, Rect->y, Rect->width, Rect->height, SSD1306_BLACK);
 }
 
+void print_screen(String strings[], unsigned int count) {
+    assert(strings);
+    unsigned int n_strings = min(STRINGS_IN_SCREEN, count);
+    for (int i = 0; i < n_strings; i++) {
+        prepare_rect(&(screen[i]));
+        display.println(strings[i]);
+    }
+}
+
+void print_line(String str, unsigned int line_ind) {
+    assert(line_ind < STRINGS_IN_SCREEN);
+    prepare_rect(&(screen[line_ind]));
+    display.println(str);
+}
+
 void display_temperature() {
+    DBG_PRINT();
     for (int sensor_ind = 0; sensor_ind < SENSORS_COUNT; sensor_ind++) {
         float temperatureC = get_sensor_recent_temp(sensor_ind);
         prepare_rect(&TEMP_DATA[sensor_ind]);
@@ -85,6 +113,7 @@ void display_temperature() {
 }
 
 void display_temp_err() {
+    DBG_PRINT();
     for (int sensor_ind = 0; sensor_ind < SENSORS_COUNT; sensor_ind++) {
         bool error = get_sensor_error(sensor_ind);
         prepare_rect(&TEMP_ERROR[sensor_ind]);
@@ -99,6 +128,7 @@ void display_temp_err() {
 }
 
 void display_CO2() {
+    DBG_PRINT();
     int co2 = get_last_co2_ppm();
     int co2_optimal = get_optimal_co2_ppm();
 
@@ -106,4 +136,12 @@ void display_CO2() {
 
     String msg = "CO2:" + String(co2) + "ppm" + "(" + String((int)round((float)co2 / co2_optimal * 100)) +"%)";
     display.println(msg);
+}
+
+
+void display_sensors() {
+    DBG_PRINT();
+    display_temperature();
+    display_temp_err();
+    display_CO2();
 }

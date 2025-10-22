@@ -1,5 +1,17 @@
 #include <Arduino.h>
 #include <array>
+#include "OLED_screen.h"
+
+#define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+
+const float TARGET_TEMP_INIT = 23.0;
+const float TARGET_TEMP_STEP = 0.5;
+const int TARGET_CO2_INIT  = 800; // ppm
+const int TARGET_CO2_STEP  = 20;  // ppm
+
+const float MIN_POS_INIT = 1.0;
+const float MAX_POS_INIT = 10.0;
+const float POS_STEP     = 0.2;
 
 // --- Enum для состояний (последовательные значения) ---
 enum MenuState {
@@ -8,9 +20,9 @@ enum MenuState {
     PAGE_MENU_DEFAULT,
 
     PAGE_MENU_MODE,
-    PAGE_MENU_MODE_DEFAULT,
-    PAGE_MENU_MODE_MANUAL,
-    PAGE_MENU_MODE_ENERGY_SAVING,
+    // PAGE_MENU_MODE_DEFAULT,
+    // PAGE_MENU_MODE_MANUAL,
+    // PAGE_MENU_MODE_ENERGY_SAVING,
 
     PAGE_MENU_PARAMS,
     PAGE_MENU_PARAMS_SET_TEMP,
@@ -23,41 +35,59 @@ enum MenuState {
     MENU_STATE_COUNT
 };
 
+enum MODE {
+  MODE_DEFAULT        = 0,
+  MODE_MANUAL         = 1,
+  MODE_ENERGY_SAVING  = 2
+};
+
+struct menu_context {
+    MenuState   state;
+    MODE        mode;
+    float       temp_target;
+    int         co2_target_ppm;
+    float       min_pos;
+    float       max_pos;
+};
+
+struct menu_context menu_ctx = {
+    .state  = PAGE_PREVIEW,
+    .mode   = MODE_DEFAULT,
+    .temp_target    = TARGET_TEMP_INIT,
+    .co2_target_ppm = TARGET_CO2_INIT,
+    .min_pos = MIN_POS_INIT,
+    .max_pos = MAX_POS_INIT
+};
+
 // --- Кнопки как int (0, 1, 2, 3) ---
 const int NUM_BUTTONS = 4;
 
-// --- Функции-обработчики обновления дисплея ---
-void preview_upd() { Serial.println("Updating Preview Page..."); }
-void menu_dflt_upd() { Serial.println("Updating Default Menu Page..."); }
-void show_mode_selection() { Serial.println("Showing Mode Selection Screen..."); }
-void set_mode_default_upd() { Serial.println("Showing Mode: Default Screen..."); }
-void set_mode_manual_upd() { Serial.println("Showing Mode: Manual Screen..."); }
-void set_mode_energy_saving_upd() { Serial.println("Showing Mode: Energy Saving Screen..."); }
-void show_params_list() { Serial.println("Showing Params List Screen..."); } // Обновление для PAGE_MENU_PARAMS
-void set_temp_upd() { Serial.println("Showing Temperature Settings Screen..."); }
-void set_co2_upd() { Serial.println("Showing CO2 Settings Screen..."); }
-void set_pos_upd() { Serial.println("Showing Position Settings Screen..."); }
-void set_pos_min_upd() { Serial.println("Showing Position Min Settings Screen..."); }
-void set_pos_max_upd() { Serial.println("Showing Position Max Settings Screen..."); }
+// forward declaration функций графики и второстепенныз обработчиков
+
+void preview_upd();
+void menu_dflt_upd();
+void show_mode_selection();
+void show_params_list();
+void set_pos_upd();
+void set_temp_upd();
+void set_co2_upd();
+void set_pos_min_upd();
+void set_pos_max_upd();
 
 // --- Функции-обработчики второстепенной логики (например, изменение значений) ---
 // Принимают номер нажатой кнопки.
-void preview_actions(int buttonIndex) { Serial.print("Preview Actions - Button: "); Serial.println(buttonIndex); }
-void menu_dflt_actions(int buttonIndex) { Serial.print("Default Menu Actions - Button: "); Serial.println(buttonIndex); }
-void mode_selection_actions(int buttonIndex) { Serial.print("Mode Selection Actions - Button: "); Serial.println(buttonIndex); }
-void mode_default_actions(int buttonIndex) { Serial.print("Mode Default Actions - Button: "); Serial.println(buttonIndex); }
-void mode_manual_actions(int buttonIndex) { Serial.print("Mode Manual Actions - Button: "); Serial.println(buttonIndex); }
-void mode_energy_saving_actions(int buttonIndex) { Serial.print("Mode Energy Saving Actions - Button: "); Serial.println(buttonIndex); }
-void params_list_actions(int buttonIndex) { Serial.print("Params List Actions - Button: "); Serial.println(buttonIndex); } // Действия для PAGE_MENU_PARAMS
-void temp_actions(int buttonIndex) { Serial.print("Temp Actions (e.g., adjust value) - Button: "); Serial.println(buttonIndex); }
-void co2_actions(int buttonIndex) { Serial.print("CO2 Actions (e.g., adjust value) - Button: "); Serial.println(buttonIndex); }
-void pos_actions(int buttonIndex) { Serial.print("Pos Actions (e.g., adjust value) - Button: "); Serial.println(buttonIndex); }
-void pos_min_actions(int buttonIndex) { Serial.print("Pos Min Actions (e.g., adjust value) - Button: "); Serial.println(buttonIndex); }
-void pos_max_actions(int buttonIndex) { Serial.print("Pos Max Actions (e.g., adjust value) - Button: "); Serial.println(buttonIndex); }
+void preview_actions(int button_index) { Serial.print("Preview Actions - Button: "); Serial.println(button_index); }
+void menu_dflt_actions(int button_index) { Serial.print("Default Menu Actions - Button: "); Serial.println(button_index); }
+void mode_selection_actions(int button_index);
+void params_list_actions(int button_index) { Serial.print("Params List Actions - Button: "); Serial.println(button_index); } // Действия для PAGE_MENU_PARAMS
+void temp_actions(int button_index);
+void co2_actions(int button_index);
+void pos_actions(int button_index) { Serial.print("Pos Actions (e.g., adjust value) - Button: "); Serial.println(button_index); }
+void pos_min_actions(int button_index);
+void pos_max_actions(int button_index);
 
-// --- Типы для указателей на функции ---
 using UpdateFunction = void(*)();
-using ActionFunction = void(*)(int); // Функция, принимающая int
+using ActionFunction = void(*)(int);
 
 // --- 2D Массив сопоставления: [состояние][кнопка] -> новое_состояние ---
 const MenuState NO_TRANSITION = static_cast<MenuState>(-1);
@@ -69,17 +99,18 @@ std::array<UpdateFunction, MENU_STATE_COUNT> displayUpdateArray;
 // --- Массив функций второстепенной обработки ---
 std::array<ActionFunction, MENU_STATE_COUNT> secondaryActionArray;
 
-void directNavigationArray_init() {
+void navigation_init() {
+    DBG_PRINT();
     directNavigationArray[PAGE_PREVIEW][0] = PAGE_MENU_DEFAULT;
     directNavigationArray[PAGE_PREVIEW][1] = PAGE_MENU_DEFAULT;
     directNavigationArray[PAGE_PREVIEW][2] = PAGE_MENU_DEFAULT;
     directNavigationArray[PAGE_PREVIEW][3] = PAGE_MENU_DEFAULT;
 
     // PAGE_MENU_DEFAULT [1]
-    directNavigationArray[PAGE_MENU_DEFAULT][0] = PAGE_PREVIEW;                                 // Кнопка 0 -> Preview
-    directNavigationArray[PAGE_MENU_DEFAULT][1] = PAGE_MENU_MODE;                               // Кнопка 1 -> Mode Selection
-    directNavigationArray[PAGE_MENU_DEFAULT][2] = PAGE_MENU_PARAMS;                             // Кнопка 2 -> Params/Param1
-    directNavigationArray[PAGE_MENU_DEFAULT][3] = PAGE_MENU_DEFAULT;                            // Кнопка 3 -> Stay/Oops
+    directNavigationArray[PAGE_MENU_DEFAULT][0] = PAGE_MENU_MODE;                               // Кнопка 0 -> mode selection
+    directNavigationArray[PAGE_MENU_DEFAULT][1] = PAGE_MENU_PARAMS;                             // Кнопка 1 -> params setting
+    directNavigationArray[PAGE_MENU_DEFAULT][2] = PAGE_PREVIEW;                                 // Кнопка 2 -> back to preview
+    directNavigationArray[PAGE_MENU_DEFAULT][3] = PAGE_PREVIEW;                                 // Кнопка 3 -> back to preview
 
     // PAGE_MENU_MODE (Экран выбора) [2]
     directNavigationArray[PAGE_MENU_MODE][0] = PAGE_MENU_DEFAULT;                               // Кнопка 0 -> Mode Default & Back to Default
@@ -126,13 +157,14 @@ void directNavigationArray_init() {
 
 // --- Функция для инициализации массива функций обновления дисплея ---
 void initializeDisplayUpdateArray() {
+    DBG_PRINT();
+
     displayUpdateArray[PAGE_PREVIEW] = preview_upd;
+
     displayUpdateArray[PAGE_MENU_DEFAULT] = menu_dflt_upd;
     displayUpdateArray[PAGE_MENU_MODE] = show_mode_selection;
-    displayUpdateArray[PAGE_MENU_MODE_DEFAULT] = set_mode_default_upd;
-    displayUpdateArray[PAGE_MENU_MODE_MANUAL] = set_mode_manual_upd;
-    displayUpdateArray[PAGE_MENU_MODE_ENERGY_SAVING] = set_mode_energy_saving_upd;
     displayUpdateArray[PAGE_MENU_PARAMS] = show_params_list; // Обновление для PAGE_MENU_PARAMS
+
     displayUpdateArray[PAGE_MENU_PARAMS_SET_TEMP] = set_temp_upd;
     displayUpdateArray[PAGE_MENU_PARAMS_SET_CO2] = set_co2_upd;
     displayUpdateArray[PAGE_MENU_PARAMS_SET_POS] = set_pos_upd;
@@ -142,13 +174,13 @@ void initializeDisplayUpdateArray() {
 
 // --- Функция для инициализации массива функций второстепенной обработки ---
 void initializeSecondaryActionArray() {
+    DBG_PRINT();
     secondaryActionArray[PAGE_PREVIEW] = preview_actions;
+
     secondaryActionArray[PAGE_MENU_DEFAULT] = menu_dflt_actions;
     secondaryActionArray[PAGE_MENU_MODE] = mode_selection_actions;
-    secondaryActionArray[PAGE_MENU_MODE_DEFAULT] = mode_default_actions;
-    secondaryActionArray[PAGE_MENU_MODE_MANUAL] = mode_manual_actions;
-    secondaryActionArray[PAGE_MENU_MODE_ENERGY_SAVING] = mode_energy_saving_actions;
     secondaryActionArray[PAGE_MENU_PARAMS] = params_list_actions; // Действия для PAGE_MENU_PARAMS
+
     secondaryActionArray[PAGE_MENU_PARAMS_SET_TEMP] = temp_actions;
     secondaryActionArray[PAGE_MENU_PARAMS_SET_CO2] = co2_actions;
     secondaryActionArray[PAGE_MENU_PARAMS_SET_POS] = pos_actions;
@@ -156,42 +188,10 @@ void initializeSecondaryActionArray() {
     secondaryActionArray[PAGE_MENU_PARAMS_SET_POS_MAX] = pos_max_actions;
 }
 
-// --- Глобальное состояние ---
-MenuState currentState = PAGE_MENU_DEFAULT;
-
-// --- Функция обработки нажатия кнопки ---
-void processButtonPress(int buttonIndex) {
-    if (buttonIndex < 0 || buttonIndex >= NUM_BUTTONS) {
-        Serial.println("Invalid button index!");
-        return;
-    }
-
-    int stateIdx = static_cast<int>(currentState);
-    if (stateIdx < 0 || stateIdx >= MENU_STATE_COUNT) {
-        Serial.println("Invalid current state!");
-        return;
-    }
-
-    MenuState newState = directNavigationArray[stateIdx][buttonIndex];
-
-    if (newState != NO_TRANSITION) {
-        if (newState != currentState) {
-            currentState = newState;
-            Serial.print("State changed to: ");
-            Serial.println(static_cast<int>(currentState));
-        }
-        // Обновление дисплея произойдёт в updateDisplay
-    } else {
-        Serial.print("No mapping defined for button ");
-        Serial.print(buttonIndex);
-        Serial.print(" in state ");
-        Serial.println(static_cast<int>(currentState));
-    }
-}
-
 // --- Функция обновления отображения в зависимости от состояния ---
 void updateDisplay() {
-    int stateIdx = static_cast<int>(currentState);
+    DBG_PRINT();
+    int stateIdx = static_cast<int>(menu_ctx.state);
     if (stateIdx >= 0 && stateIdx < MENU_STATE_COUNT) {
         displayUpdateArray[stateIdx](); // Вызываем функцию обновления для текущего состояния
     } else {
@@ -199,63 +199,208 @@ void updateDisplay() {
     }
 }
 
-void loop() {
-    // Здесь вы будете получать реальные события кнопок
-    // и вызывать processButtonPress с номером нажатой кнопки (0-3)
-    // Пример симуляции:
-    static unsigned long lastSimTime = millis();
-    static int simStep = 0;
-    if (millis() - lastSimTime > 4000) { // Каждые 4 секунды
-        Serial.println("\n--- Simulation Step ---");
-        // Имитируем нажатие кнопок в зависимости от состояния
-        int simulatedButton = -1;
-        switch (currentState) {
-            case PAGE_MENU_DEFAULT:
-                simulatedButton = 1; // В меню MODE
-                break;
-            case PAGE_MENU_MODE:
-                simulatedButton = 0; // Выбрать MODE_DEFAULT
-                break;
-            case PAGE_MENU_MODE_DEFAULT:
-            case PAGE_MENU_MODE_MANUAL:
-            case PAGE_MENU_MODE_ENERGY_SAVING:
-                simulatedButton = 3; // Назад к DEFAULT
-                break;
-            case PAGE_MENU_PARAMS_SET_PARAM1:
-                simulatedButton = 0; // К следующему параметру
-                break;
-            case PAGE_MENU_PARAMS_SET_PARAM2:
-                simulatedButton = 1; // К следующему параметру
-                break;
-            case PAGE_MENU_PARAMS_SET_PARAM3:
-                simulatedButton = 2; // К следующему параметру
-                break;
-            case PAGE_MENU_PARAMS_SET_PARAM4:
-                simulatedButton = 3; // Назад
-                break;
-            default:
-                simulatedButton = 3; // Назад
-        }
-        Serial.print("Simulating button press: ");
-        Serial.println(simulatedButton);
-        processButtonPress(simulatedButton);
-        updateDisplay(); // Обновляем дисплей после перехода
-        simStep++;
-        lastSimTime = millis();
+// --- Функция обработки нажатия кнопки ---
+void processButtonPress(int buttonIndex) {
+    DBG_PRINT();
+    if (buttonIndex < 0 || buttonIndex >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
     }
 
-    delay(100); // Имитация работы loop
+    int stateIdx = static_cast<int>(menu_ctx.state);
+    if (stateIdx < 0 || stateIdx >= MENU_STATE_COUNT) {
+        Serial.println("Invalid current state!");
+        return;
+    }
+
+    secondaryActionArray[menu_ctx.state](buttonIndex);
+
+    MenuState newState = directNavigationArray[stateIdx][buttonIndex];
+    if (newState != NO_TRANSITION) {
+        if (newState != menu_ctx.state) {
+            menu_ctx.state = newState;
+            Serial.print("State changed to: ");
+            Serial.println(static_cast<int>(menu_ctx.state));
+        }
+        // Обновление дисплея произойдёт в updateDisplay
+    } else {
+        Serial.print("No mapping defined for button ");
+        Serial.print(buttonIndex);
+        Serial.print(" in state ");
+        Serial.println(static_cast<int>(menu_ctx.state));
+    }
+
+    // 3. Вызываем функцию обновления дисплея для нового состояния
+    updateDisplay();
 }
+
+// --- Пример использования ---
+void menu_setup() {
+    DBG_PRINT();
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("Starting menu system with secondary actions...");
+    navigation_init();
+    Serial.println("1");
+    initializeDisplayUpdateArray();
+    Serial.println("2");
+    initializeSecondaryActionArray();
+    Serial.println("3");
+    updateDisplay(); // Инициализация отображения
+
+    Serial.println("Menu setup completed");
+}
+
+// графика для меню ===========================================================================================================//
 
 void preview_upd() {
-    display_temperature();
-    display_CO2();
+    DBG_PRINT();
+
+    display_sensors();
+    print_line("1-4: menu", 3);
 }
 
-void menu_upd() {
-    switch (menu_ctx.option) {
-        case OPT_NONE:      handle
-        case OPT_MODE:
-        case OPT_PARAMS:
+String menu_dflt_text[] = {
+    "1: mode",
+    "2: params",
+    "3: leave"
+};
+
+String mode_selection_text[] = {
+    "1: default",
+    "2: manual",
+    "3: energy-saving",
+    "4: leave"
+};
+
+String params_list_text[] = {
+    "1: temp",
+    "2: co2",
+    "3: motor",
+    "4: leave",
+};
+
+String pos_upd_text[] = {
+    "1: min position",
+    "2: max position",
+    "3: leave"
+};
+
+void menu_dflt_upd()        { DBG_PRINT(); print_screen(menu_dflt_text,      3); }
+void show_mode_selection()  { DBG_PRINT(); print_screen(mode_selection_text, 4); }
+void show_params_list()     { DBG_PRINT(); print_screen(params_list_text,    4); }
+void set_pos_upd()          { DBG_PRINT(); print_screen(pos_upd_text,        3); }
+
+template<typename T>
+void print_upd_param(T param, T param_step, String comment) {
+    DBG_PRINT();
+
+    String upd_param_text[] = {
+        "  " + String(param) + " " + comment,
+        "1: inc " + String(param_step),
+        "2: dec " + String(param_step),
+        "3: OK",
+        "4: cancel"
+    };
+    print_screen(upd_param_text, 4);
+}
+
+void set_temp_upd()     { DBG_PRINT(); print_upd_param(menu_ctx.temp_target,     TARGET_TEMP_STEP,   "C"); }
+void set_co2_upd()      { DBG_PRINT(); print_upd_param(menu_ctx.co2_target_ppm,  TARGET_CO2_STEP,    "ppm"); }
+void set_pos_min_upd()  { DBG_PRINT(); print_upd_param(menu_ctx.min_pos,         POS_STEP,           "?"); }
+void set_pos_max_upd()  { DBG_PRINT(); print_upd_param(menu_ctx.max_pos,         POS_STEP,           "?` "); }
+
+// действия при нажатии на кнопку в меню ======================================================================================//
+
+void mode_selection_actions(int button_index) {
+    DBG_PRINT();
+
+    Serial.print("Mode Selection Actions - Button: "); Serial.println(button_index);
+    if (button_index < 0 || button_index >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
+    }
+    menu_ctx.mode = (MODE)button_index;
+}
+
+void temp_actions(int button_index) {
+    DBG_PRINT();
+
+    Serial.print("Temp Actions (e.g., adjust value) - Button: "); Serial.println(button_index);
+    if (button_index < 0 || button_index >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
+    }
+
+    static float prev_target_temp = TARGET_TEMP_INIT;
+
+    switch(button_index) {
+        case 0: menu_ctx.temp_target += TARGET_TEMP_STEP;   break;
+        case 1: menu_ctx.temp_target -= TARGET_TEMP_STEP;   break;
+        case 2: prev_target_temp = menu_ctx.temp_target;    break;
+        case 3: menu_ctx.temp_target = prev_target_temp;    break;
+        default: assert(0);
     }
 }
+
+void co2_actions(int button_index) {
+    DBG_PRINT();
+
+    Serial.print("CO2 Actions (e.g., adjust value) - Button: "); Serial.println(button_index);
+    if (button_index < 0 || button_index >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
+    }
+
+    static int prev_target_co2 = TARGET_CO2_INIT;
+
+    switch(button_index) {
+        case 0: menu_ctx.co2_target_ppm += TARGET_CO2_STEP;   break;
+        case 1: menu_ctx.co2_target_ppm -= TARGET_CO2_STEP;   break;
+        case 2: prev_target_co2 = menu_ctx.co2_target_ppm;    break;
+        case 3: menu_ctx.co2_target_ppm = prev_target_co2;    break;
+        default: assert(0);
+    }
+}
+
+void pos_min_actions(int button_index) {
+    DBG_PRINT();
+
+    Serial.print("Pos Min Actions (e.g., adjust value) - Button: "); Serial.println(button_index);
+    if (button_index < 0 || button_index >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
+    }
+
+    static float prev_min_pos = MIN_POS_INIT;
+
+    switch(button_index) {
+        case 0: menu_ctx.min_pos += POS_STEP;       break;
+        case 1: menu_ctx.min_pos -= POS_STEP;       break;
+        case 2: prev_min_pos = menu_ctx.min_pos;    break;
+        case 3: menu_ctx.min_pos = prev_min_pos;    break;
+        default: assert(0);
+    }
+}
+
+void pos_max_actions(int button_index) {
+    DBG_PRINT();
+
+    Serial.print("Pos Max Actions (e.g., adjust value) - Button: "); Serial.println(button_index);
+    if (button_index < 0 || button_index >= NUM_BUTTONS) {
+        Serial.println("Invalid button index!");
+        return;
+    }
+
+    static float prev_max_pos = MAX_POS_INIT;
+
+    switch(button_index) {
+        case 0: menu_ctx.max_pos += POS_STEP;       break;
+        case 1: menu_ctx.max_pos -= POS_STEP;       break;
+        case 2: prev_max_pos = menu_ctx.max_pos;    break;
+        case 3: menu_ctx.max_pos = prev_max_pos;    break;
+        default: assert(0);
+    }
+}
+
+

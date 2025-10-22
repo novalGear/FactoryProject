@@ -5,6 +5,8 @@
 #include "OLED_screen.h"
 #include "sensors.h"
 
+#define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+
 extern const int SENSORS_COUNT;
 
 // =============== Константы ===============
@@ -101,13 +103,15 @@ void temperature_sensors_update() {
 }
 
 float get_sensor_recent_temp(int sensor_ind) {
-    assert(sensor_ind < SENSORS_COUNT && sensor_ind > 0);
+    assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);
     if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
+    DBG_PRINT();
+    Serial.println("sensor " + String(sensor_ind));
     return temp_sensors[sensor_ind].last_tempC;
 }
 
 bool get_sensor_error(int sensor_ind) {
-    assert(sensor_ind < SENSORS_COUNT && sensor_ind > 0);
+    assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);
     if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
     return temp_sensors[sensor_ind].error;
 }
@@ -154,7 +158,6 @@ void co2_read_and_display() {
 
                 if (response[8] == checksum) {
                     int co2 = (response[2] << 8) + response[3];
-                    display_CO2(co2, co2_optimal);
                     Serial.print("CO2: ");
                     Serial.print(co2);
                     Serial.println(" ppm");
