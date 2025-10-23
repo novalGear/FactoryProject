@@ -11,10 +11,19 @@ extern const int SENSORS_COUNT;
 
 // =============== Константы ===============
 
-const int TEMP_INTERVAL   = 10000;  // интервал между запросами измерения (мс)
+const int TEMP_INTERVAL   = 5000;  // интервал между запросами измерения (мс)
 const int TEMP_READ_DELAY = 1000;   // задержка перед чтением температуры (мс) — датчикам нужно ~750 мс на 12 битах
 
 const int RESOLUTION_BITS = 10;     // устанавливаем точность измерения в битах (12 максимум)
+
+
+
+
+float       T_avg_recent = 0.0;
+const int   T_avg_intervals_count = 5;
+
+int         interval_num = 0;
+float       T_avg_to_sub = 0.0;
 
 enum TempState {
     STATE_WAITING_FOR_READ,     // ждём, когда можно прочитать
@@ -67,7 +76,30 @@ void temp_sensors_read() {
             temp_sensors[i].error = false;
         }
     }
+
+    upd_avg_temp();
 }
+
+void upd_avg_temp() {
+    int valid_count = 0;
+    float sum_temp = 0.0;
+    for (int i = 0; i < SENSORS_COUNT; i++) {
+        if (!temp_sensors[i].error) {
+            ++valid_count;
+            sum_temp += temp_sensors[i].last_tempC;
+        }
+    }
+
+    ++interval_num;
+    if (valid_count > 0) {
+        float last_avg_temp = sum_temp / valid_count();
+        int n_intervals = min(interval_num, T_avg_intervals_count);
+        T_avg_recent += last_avg_temp -
+    } else {
+        T_avg_recent = NAN;
+    }
+}
+
 //
 // void read_and_display_temp() {
 //     temp_sensors_read();

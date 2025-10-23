@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <array>
 #include "OLED_screen.h"
+// #include "metric_control.h"
 
 #define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
 
@@ -230,23 +231,18 @@ void processButtonPress(int buttonIndex) {
         Serial.println(static_cast<int>(menu_ctx.state));
     }
 
-    // 3. Вызываем функцию обновления дисплея для нового состояния
     updateDisplay();
 }
 
-// --- Пример использования ---
 void menu_setup() {
     DBG_PRINT();
     Serial.begin(115200);
     delay(1000);
     Serial.println("Starting menu system with secondary actions...");
     navigation_init();
-    Serial.println("1");
     initializeDisplayUpdateArray();
-    Serial.println("2");
     initializeSecondaryActionArray();
-    Serial.println("3");
-    updateDisplay(); // Инициализация отображения
+    updateDisplay();
 
     Serial.println("Menu setup completed");
 }
@@ -257,7 +253,7 @@ void preview_upd() {
     DBG_PRINT();
 
     display_sensors();
-    print_line("1-4: menu", 3);
+    print_line("1-4: menu", 4);
 }
 
 String menu_dflt_text[] = {
@@ -302,13 +298,13 @@ void print_upd_param(T param, T param_step, String comment) {
         "3: OK",
         "4: cancel"
     };
-    print_screen(upd_param_text, 4);
+    print_screen(upd_param_text, 5);
 }
 
 void set_temp_upd()     { DBG_PRINT(); print_upd_param(menu_ctx.temp_target,     TARGET_TEMP_STEP,   "C"); }
 void set_co2_upd()      { DBG_PRINT(); print_upd_param(menu_ctx.co2_target_ppm,  TARGET_CO2_STEP,    "ppm"); }
 void set_pos_min_upd()  { DBG_PRINT(); print_upd_param(menu_ctx.min_pos,         POS_STEP,           "?"); }
-void set_pos_max_upd()  { DBG_PRINT(); print_upd_param(menu_ctx.max_pos,         POS_STEP,           "?` "); }
+void set_pos_max_upd()  { DBG_PRINT(); print_upd_param(menu_ctx.max_pos,         POS_STEP,           "?"); }
 
 // действия при нажатии на кнопку в меню ======================================================================================//
 

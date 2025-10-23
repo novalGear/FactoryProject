@@ -34,9 +34,9 @@ struct rect screen[] = {
 };
 
 const struct rect TEMP_DATA[] = {
-    {0, DIGIT_HEIGHT * 1, 7 * DIGIT_WIDTH, DIGIT_HEIGHT},
-    {0, DIGIT_HEIGHT * 2, 7 * DIGIT_WIDTH, DIGIT_HEIGHT},
-    {0, DIGIT_HEIGHT * 3, 7 * DIGIT_WIDTH, DIGIT_HEIGHT}
+    {0, DIGIT_HEIGHT * 0, 8 * DIGIT_WIDTH, DIGIT_HEIGHT},
+    {0, DIGIT_HEIGHT * 1, 8 * DIGIT_WIDTH, DIGIT_HEIGHT},
+    {0, DIGIT_HEIGHT * 2, 8 * DIGIT_WIDTH, DIGIT_HEIGHT}
 };
 
 const struct rect TEMP_ERROR[] = {
@@ -45,7 +45,7 @@ const struct rect TEMP_ERROR[] = {
     {TEMP_DATA[2].width + DIGIT_WIDTH, TEMP_DATA[2].y, max(SCREEN_WIDTH - (TEMP_DATA[2].width + DIGIT_WIDTH), 0), DIGIT_HEIGHT}
 };
 
-const struct rect CO2_DATA = {0, DIGIT_HEIGHT * 4, SCREEN_WIDTH, DIGIT_HEIGHT};
+const struct rect CO2_DATA = {0, DIGIT_HEIGHT * 3, SCREEN_WIDTH, DIGIT_HEIGHT};
 
 const int OLED_RESET    = -1;  // Не используем сброс (если не подключен)
 
@@ -108,7 +108,7 @@ void display_temperature() {
         float temperatureC = get_sensor_recent_temp(sensor_ind);
         prepare_rect(&TEMP_DATA[sensor_ind]);
         display.print(temperatureC);
-        display.println(" C");
+        display.println(" C ");
     }
 }
 
