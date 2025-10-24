@@ -1,6 +1,6 @@
 #pragma once
 
-const int SENSORS_COUNT = 3;    // общее количество датчиков
+const int SENSORS_COUNT = 3;    // общее количество датчиков температуры
 
 void temp_sensors_setup();
 void temperature_sensors_update();

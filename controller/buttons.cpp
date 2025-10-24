@@ -1,12 +1,11 @@
 #include <OneButton.h>
 
-// пины подключения тактовых кнопок
 const int BUTTON_PINS[] = {13, 12, 14, 27};
 const int NUM_BUTTONS = sizeof(BUTTON_PINS) / sizeof(BUTTON_PINS[0]);
 
 bool buttonEventOccurred = false; //
 int pressedButtonIndex = -1; // Номер кнопки (-1 = нет события)
-int pressedButtonType = 0;   // Тип события (например, 1 = click, 2 = double-click, 3 = press)
+int pressedButtonType = 0;
 
 // Определение констант для типов событий
 const int EVENT_NONE = 0;

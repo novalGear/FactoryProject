@@ -14,7 +14,6 @@ const float MIN_POS_INIT = 1.0;
 const float MAX_POS_INIT = 10.0;
 const float POS_STEP     = 0.2;
 
-// --- Enum для состояний (последовательные значения) ---
 enum MenuState {
     PAGE_PREVIEW,
 
@@ -60,10 +59,9 @@ struct menu_context menu_ctx = {
     .max_pos = MAX_POS_INIT
 };
 
-// --- Кнопки как int (0, 1, 2, 3) ---
 const int NUM_BUTTONS = 4;
 
-// forward declaration функций графики и второстепенныз обработчиков
+// forward declaration функций графики и второстепенных обработчиков
 
 void preview_upd();
 void menu_dflt_upd();
@@ -156,7 +154,6 @@ void navigation_init() {
 
 }
 
-// --- Функция для инициализации массива функций обновления дисплея ---
 void initializeDisplayUpdateArray() {
     DBG_PRINT();
 
@@ -164,7 +161,7 @@ void initializeDisplayUpdateArray() {
 
     displayUpdateArray[PAGE_MENU_DEFAULT] = menu_dflt_upd;
     displayUpdateArray[PAGE_MENU_MODE] = show_mode_selection;
-    displayUpdateArray[PAGE_MENU_PARAMS] = show_params_list; // Обновление для PAGE_MENU_PARAMS
+    displayUpdateArray[PAGE_MENU_PARAMS] = show_params_list;
 
     displayUpdateArray[PAGE_MENU_PARAMS_SET_TEMP] = set_temp_upd;
     displayUpdateArray[PAGE_MENU_PARAMS_SET_CO2] = set_co2_upd;
@@ -173,14 +170,13 @@ void initializeDisplayUpdateArray() {
     displayUpdateArray[PAGE_MENU_PARAMS_SET_POS_MAX] = set_pos_max_upd;
 }
 
-// --- Функция для инициализации массива функций второстепенной обработки ---
 void initializeSecondaryActionArray() {
     DBG_PRINT();
     secondaryActionArray[PAGE_PREVIEW] = preview_actions;
 
     secondaryActionArray[PAGE_MENU_DEFAULT] = menu_dflt_actions;
     secondaryActionArray[PAGE_MENU_MODE] = mode_selection_actions;
-    secondaryActionArray[PAGE_MENU_PARAMS] = params_list_actions; // Действия для PAGE_MENU_PARAMS
+    secondaryActionArray[PAGE_MENU_PARAMS] = params_list_actions;
 
     secondaryActionArray[PAGE_MENU_PARAMS_SET_TEMP] = temp_actions;
     secondaryActionArray[PAGE_MENU_PARAMS_SET_CO2] = co2_actions;
@@ -189,18 +185,16 @@ void initializeSecondaryActionArray() {
     secondaryActionArray[PAGE_MENU_PARAMS_SET_POS_MAX] = pos_max_actions;
 }
 
-// --- Функция обновления отображения в зависимости от состояния ---
 void updateDisplay() {
     DBG_PRINT();
     int stateIdx = static_cast<int>(menu_ctx.state);
     if (stateIdx >= 0 && stateIdx < MENU_STATE_COUNT) {
-        displayUpdateArray[stateIdx](); // Вызываем функцию обновления для текущего состояния
+        displayUpdateArray[stateIdx]();
     } else {
         Serial.println("Warning: Invalid state for display update!");
     }
 }
 
-// --- Функция обработки нажатия кнопки ---
 void processButtonPress(int buttonIndex) {
     DBG_PRINT();
     if (buttonIndex < 0 || buttonIndex >= NUM_BUTTONS) {
@@ -223,7 +217,7 @@ void processButtonPress(int buttonIndex) {
             Serial.print("State changed to: ");
             Serial.println(static_cast<int>(menu_ctx.state));
         }
-        // Обновление дисплея произойдёт в updateDisplay
+
     } else {
         Serial.print("No mapping defined for button ");
         Serial.print(buttonIndex);

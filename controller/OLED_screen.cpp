@@ -47,16 +47,16 @@ const struct rect TEMP_ERROR[] = {
 
 const struct rect CO2_DATA = {0, DIGIT_HEIGHT * 3, SCREEN_WIDTH, DIGIT_HEIGHT};
 
-const int OLED_RESET    = -1;  // Не используем сброс (если не подключен)
+const int OLED_RESET    = -1;
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 void OLED_screen_setup() {
-    const int SDA_PIN = 21; // замените на ваш пин, если другой
-    const int SCL_PIN = 22; // замените на ваш пин, если другой
+    const int SDA_PIN = 21;
+    const int SCL_PIN = 22;
 
     Wire.begin(SDA_PIN, SCL_PIN);
-    Wire.setClock(100000); // 100 кГц — надёжно
+    Wire.setClock(100000);
 
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         Serial.println("OLED не найден или не отвечает!");
