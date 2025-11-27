@@ -4,7 +4,8 @@
 
 #include "sensors.h"
 
-#define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+// #define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+#define DBG_PRINT()
 
 extern const int SENSORS_COUNT;
 

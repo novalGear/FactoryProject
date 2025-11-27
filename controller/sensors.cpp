@@ -5,7 +5,8 @@
 #include "OLED_screen.h"
 #include "sensors.h"
 
-#define DBG_PRINT() Serial.println(String(__FILE__) + ":" + String(__LINE__) + " (" + String(__PRETTY_FUNCTION__) + ")")
+// #define DBG_PRINT() Serial.println(String(__PRETTY_FUNCTION__) + ":" + String(__LINE__))
+#define DBG_PRINT()
 
 extern const int SENSORS_COUNT;
 
@@ -77,28 +78,28 @@ void temp_sensors_read() {
         }
     }
 
-    upd_avg_temp();
+    // upd_avg_temp();
 }
 
-void upd_avg_temp() {
-    int valid_count = 0;
-    float sum_temp = 0.0;
-    for (int i = 0; i < SENSORS_COUNT; i++) {
-        if (!temp_sensors[i].error) {
-            ++valid_count;
-            sum_temp += temp_sensors[i].last_tempC;
-        }
-    }
+// void upd_avg_temp() {
+//     int valid_count = 0;
+//     float sum_temp = 0.0;
+//     for (int i = 0; i < SENSORS_COUNT; i++) {
+//         if (!temp_sensors[i].error) {
+//             ++valid_count;
+//             sum_temp += temp_sensors[i].last_tempC;
+//         }
+//     }
 
-    ++interval_num;
-    if (valid_count > 0) {
-        float last_avg_temp = sum_temp / valid_count();
-        int n_intervals = min(interval_num, T_avg_intervals_count);
-        T_avg_recent += last_avg_temp -
-    } else {
-        T_avg_recent = NAN;
-    }
-}
+//     ++interval_num;
+//     if (valid_count > 0) {
+//         float last_avg_temp = sum_temp / valid_count();
+//         int n_intervals = min(interval_num, T_avg_intervals_count);
+//         T_avg_recent += last_avg_temp -
+//     } else {
+//         T_avg_recent = NAN;
+//     }
+// }
 
 //
 // void read_and_display_temp() {
