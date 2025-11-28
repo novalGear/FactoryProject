@@ -1,40 +1,38 @@
 #include <Arduino.h>
+#include "motor_impl.h"
 
 #define DBG_PRINT() Serial.println(String(__PRETTY_FUNCTION__) + ":" + String(__LINE__))
 
-const int MOTOR_PWM_PIN = 18;   // Пин ШИМ -> на вход ШИМ драйвера BLDC
-const int MOTOR_DIR_PIN = 19;   // Пин направления -> на вход DIR драйвера BLDC
-const int ENCODER_OUTPUT_PIN = 26;     // encoder pin
+const int MOTOR_PWM_PIN = 18;           // Пин ШИМ -> на вход ШИМ драйвера BLDC
+const int MOTOR_DIR_PIN = 19;           // Пин направления -> на вход DIR драйвера BLDC
+const int ENCODER_OUTPUT_PIN = 26;      // encoder pin
 
 const int PWM_FREQ = 20000;         // Частота ШИМ
 const int PWM_RESOLUTION_BITS = 8;  // Разрешение ШИМ (8 бит = 0-255)
 
 volatile long encoderCount = 0;
-volatile byte lastEncoded = 0;
-volatile int current_motor_dir = 0; // 1 - вперед, -1 - назад, 0 - остановлен
+long lastStoppedEncoderCount = 0;
+volatile int current_motor_dir = 0; // 1 - вперед, -1 - назад
 
 bool ledcAttached = false;
 
 unsigned long lastSerialPrint = 0;
 const unsigned long serialPrintInterval = 500;
 
-// Глобальная константа для разрешения энкодера (установите ваше значение)
-const int ENCODER_RESOLUTION = 100; // Пример: 2000 тиков на оборот
+const int ENCODER_RESOLUTION = 256;                         // Глобальная константа для разрешения энкодера
+const unsigned long CRIT_THRESHOLD  = 10;                   // Критическое значение внешнего поворота
+const unsigned long MAX_MOTOR_POS   = 2000;                 // максимальное значение в ед. изм. энкодера
+const unsigned long MAX_POS         = 10;                   // число возможных позиций мотора
 
-// Флаг, указывающий, что выполняется задача поворота
-static bool motorMoveTaskActive = false;
-// Целевое количество тиков для поворота (относительно начальной позиции)
-static long targetTickCount = 0;
-// Начальная позиция энкодера в начале задачи поворота
-static long initialencoderCount = 0;
-// Требуемое количество оборотов (может быть дробным)
-static float requiredRevolutions = 0.0;
-// Требуемое направление (-1 или +1)
-static int requiredDirection = 1; // 1 для FORWARD, -1 для BACKWARD
-// Требуемая скорость (0-1023 для 10-битного PWM)
-static int requiredSpeed = 512; // Пример: 50% скважности
+static bool motorMoveTaskActive = false;                    // Флаг, указывающий, что выполняется задача поворота
+static long targetTickCount = 0;                            // Целевое количество тиков для поворота (относительно начальной позиции)
+static long initialencoderCount = 0;                        // Начальная позиция энкодера в начале задачи поворота
 
-const unsigned long DFLT_TIMEOUT = 10000;
+// static float requiredRevolutions = 0.0;                     // Требуемое количество оборотов (может быть дробным)
+static int requiredDirection = 1;                           // Требуемое направление: 1 для FORWARD, -1 для BACKWARD
+static int requiredSpeed = 0;                               // Требуемая скорость (0-1023 для 10-битного PWM)
+
+int curr_pos_ind = 0;
 
 volatile unsigned long isrCallCount = 0;
 
@@ -42,46 +40,45 @@ void IRAM_ATTR encoderISR() {
   encoderCount += current_motor_dir;
 }
 
+void updateStoppedPosition() {
+    lastStoppedEncoderCount = encoderCount;
+}
+
+// Forward declaration
+
+void stop_motor();
+void set_motor_speed(int speed, int direction);
+
 // basic motor management =======================================================================================================//
 
 void stop_motor() {
-  if (ledcAttached) {
-    ledcWrite(MOTOR_PWM_PIN, 0);
-  } else {
-    digitalWrite(MOTOR_PWM_PIN, LOW);
-  }
-  current_motor_dir = 0;
-  Serial.println("Motor STOPPED");
+    set_motor_speed(0, 0);
+    motorMoveTaskActive = false;
+    Serial.println("Motor STOPPED (direction preserved)");
 }
 
-
 void set_motor_speed(int speed, int direction) {
-    // speed: 0-255
-    // direction: 0 или 1
-    assert(speed >= 0 || speed < 255);
-    assert(direction > 0 || direction < 2);
-    // direction [1, 0] -> [1, -1]
-    current_motor_dir = 2 * direction - 1;
+    assert(speed >= 0 && speed <= 255);
+    assert(direction == 0 || direction == 1);
 
-    digitalWrite(MOTOR_DIR_PIN, direction);
-
+    if (speed > 0) {
+        current_motor_dir = (direction == 1) ? 1 : -1;
+    }
     if (!ledcAttached) {
         if (ledcAttach(MOTOR_PWM_PIN, PWM_FREQ, PWM_RESOLUTION_BITS)) {
-        ledcAttached = true;
-        Serial.println("LEDC attached");
+            ledcAttached = true;
         }
     }
 
-    if (ledcAttached) {
-        ledcWrite(MOTOR_PWM_PIN, speed);
-    }
-    //
-    //   Serial.print("Motor: Speed=");
-    //   Serial.print(speed);
-    //   Serial.print(" (");
-    //   Serial.print((speed * 100) / 255);
-    //   Serial.print("%), DIR=");
-    //   Serial.println(direction ? "HIGH" : "LOW");
+    digitalWrite(MOTOR_DIR_PIN, direction);
+    ledcWrite(MOTOR_PWM_PIN, speed);
+
+    Serial.print("Motor: Speed=");
+    Serial.print(speed);
+    Serial.print(", DIR=");
+    Serial.print(direction ? "HIGH" : "LOW");
+    Serial.print(", CurrentDir=");
+    Serial.println(current_motor_dir);
 }
 
 void detach_motor_pwm() {
@@ -128,32 +125,62 @@ bool isMotorMoveTaskActive() {
     return motorMoveTaskActive;
 }
 
-// usable motor utils ===========================================================================================================//
 
+/**
+ * @brief Проверяет, было ли внешнее воздействие на остановленный мотор
+ * @param threshold Пороговое значение тиков для обнаружения движения
+ * @return true если обнаружено значительное внешнее воздействие
+ */
+bool checkExternalMovement(long threshold = CRIT_THRESHOLD) {
+    // Если мотор сейчас движется - не проверяем
+    if (isMotorMoveTaskActive()) {
+        return false;
+    }
+    // Проверяем разницу с последней зафиксированной позицией
+    long positionDiff = abs(encoderCount - lastStoppedEncoderCount);
 
+    if (positionDiff >= threshold) {
+        Serial.print("EXTERNAL MOVEMENT DETECTED! Diff: ");
+        Serial.print(positionDiff);
+        Serial.print(" ticks (");
+        Serial.print(encoderCount);
+        Serial.print(" vs ");
+        Serial.print(lastStoppedEncoderCount);
+        Serial.println(")");
 
-void setMotorMoveTask(float revolutions, int direction, int speed) {
-    if (revolutions < 0) {
-        revolutions = -revolutions;
-        direction = 1 - direction;
+        // Обновляем эталонную позицию на текущую
+        updateStoppedPosition();
+        return true;
     }
 
-    // Защита от нулевых оборотов
-    if (revolutions <= 0) {
+    return false;
+}
+
+// usable motor utils ===========================================================================================================//
+
+void setMotorMoveTask(unsigned long ticks, int direction, int speed) {
+    assert(direction == 0 || direction == 1);
+    if (ticks == 0) {
         stop_motor();
         return;
     }
+//
+//     if (checkExternalMovement) {
+//         Serial.println("External movement caught");
+//         reset_motor();
+//     }
 
-    requiredRevolutions = revolutions;
-    requiredDirection = (direction > 0) ? 1 : 0; // фикс для бинарного направления
+    // проверка на значения direction
+
+    // requiredRevolutions = ticks;
+    requiredDirection = direction;
     requiredSpeed = constrain(speed, 0, 1023);
-    targetTickCount = (long)(requiredRevolutions * ENCODER_RESOLUTION);
+    targetTickCount = ticks; // (long)(requiredRevolutions * ENCODER_RESOLUTION);
     initialencoderCount = encoderCount;
     motorMoveTaskActive = true;
 
     Serial.print("Move Task: ");
-    Serial.print(requiredRevolutions, 3);
-    Serial.print(" revs, dir=");
+    Serial.print("dir=");
     Serial.print(requiredDirection);
     Serial.print(", speed=");
     Serial.print(requiredSpeed);
@@ -164,48 +191,45 @@ void setMotorMoveTask(float revolutions, int direction, int speed) {
     Serial.println(")");
 }
 
-// Улучшенная версия MotorExecMoveTask
 bool MotorExecMoveTask() {
     if (!motorMoveTaskActive) {
         return false;
     }
 
-    long currentTickCount = abs(encoderCount - initialencoderCount);
+    long currentDisplacement = encoderCount - initialencoderCount;
+    long absoluteDisplacement = abs(currentDisplacement);
 
-    Serial.println("ticks: encoderCount=" + String(encoderCount) + ", initial=" + String(initialencoderCount) + ", current=" +String(currentTickCount));
-    // Добавим защиту от переполнения и проверку прогресса
-    if (currentTickCount >= targetTickCount) {
+    // ДЛЯ ОТЛАДКИ - выводим реальные значения
+    Serial.println("DEBUG: curr=" + String(encoderCount) +
+                  ", init=" + String(initialencoderCount) +
+                  ", disp=" + String(currentDisplacement) +
+                  ", target=" + String(targetTickCount));
+
+    if (absoluteDisplacement >= targetTickCount) {
         stop_motor();
-        Serial.print("Move completed. Final ticks: ");
-        Serial.println(currentTickCount);
+        lastStoppedEncoderCount = encoderCount;
+        Serial.println("Move COMPLETED. Ticks: " + String(absoluteDisplacement));
         return false;
     }
 
-    // Плавное торможение при приближении к цели (опционально)
-    long remainingTicks = targetTickCount - currentTickCount;
-    if (remainingTicks < 100) { // На последних 100 тиках
-        int slowSpeed = map(remainingTicks, 0, 100, 0, requiredSpeed);
-        set_motor_speed(slowSpeed, requiredDirection);
-    } else {
-        set_motor_speed(requiredSpeed, requiredDirection);
-    }
-
+    // Продолжаем движение
+    set_motor_speed(requiredSpeed, requiredDirection);
     return true;
 }
 
 /**
  * @brief Блокирующее перемещение мотора на заданное число оборотов
  *
- * @param revolutions Количество оборотов (отрицательные = обратное направление)
+ * @param ticks Поворот в тиках энкодера
  * @param direction Направление (0 или 1)
  * @param speed Скорость ШИМ (0-1023)
  * @param timeout_ms Таймаут в миллисекундах (0 = без таймаута)
  * @return true - успешное выполнение, false - таймаут или ошибка
  */
-bool unint_motor_move(float revolutions, int direction, int speed, unsigned long timeout_ms = DFLT_TIMEOUT) {
-    setMotorMoveTask(revolutions, direction, speed);
+bool unint_motor_move(unsigned long ticks, int direction, int speed, unsigned long timeout_ms) {
+    setMotorMoveTask(ticks, direction, speed);
     unsigned long startTime = millis();
-
+    Serial.println("motor init encoder position: " + String(encoderCount));
     while(MotorExecMoveTask()) {
         // Проверка таймаута
         if (timeout_ms > 0 && (millis() - startTime) > timeout_ms) {
@@ -217,7 +241,7 @@ bool unint_motor_move(float revolutions, int direction, int speed, unsigned long
         // Короткая задержка для стабильности
         delay(1);
     }
-
+    stop_motor();
     // Короткая пауза для стабилизации после остановки
     delay(50);
     return true;
@@ -228,83 +252,37 @@ void cancelMotorMoveTask() {
     Serial.println("Motor Move Task Cancelled.");
 }
 
+// discrete control =============================================================================================================//
+
+unsigned long pos2ticks(int pos) {
+    if (pos == curr_pos_ind)    { return 0;  }
+    if (pos > MAX_POS)          { return -1; }
+    return (MAX_MOTOR_POS / MAX_POS) * pos;
+}
+
+int dir2pos(int pos) {
+    return ((pos - curr_pos_ind) > 0 ) ? 1 : 0;
+}
+
+int change_pos(int pos) {
+    if (pos == curr_pos_ind)    { return 0;  }
+    if (pos > MAX_POS)          { return -1; }
+
+    unsigned long ticks = pos2ticks(pos);
+    int direction = dir2pos(pos);
+    unint_motor_move(ticks, direction);
+}
+
+int get_current_position_index() {
+    return curr_pos_ind;
+}
+
 // Testing ======================================================================================================================//
 
 void motor_test() {
-  // DBG_PRINT();
-  unsigned long currentTime = millis();
-
-  static bool motorIsStopping = false;
-  static unsigned int lastDirectionChange = 0;
-  unsigned int stopDuration = 2000;
-  unsigned int directionChangeInterval = 5000;
-  unsigned int motorSpeed = 200;
-  static bool motorDirection = false;
-  static unsigned int stopStartTime = 0;
-
-  if (!motorIsStopping) {
-    if (currentTime - lastDirectionChange >= directionChangeInterval) {
-      motorIsStopping = true;
-      stopStartTime = currentTime;
-
-      // if (ledcAttached) {
-      //   ledcDetach(MOTOR_PWM_PIN);
-      //   ledcAttached = false;
-      //   Serial.println("LEDC detached from pin, motor should stop.");
-      // }
-      // digitalWrite(MOTOR_PWM_PIN, HIGH);
-      // Serial.println("Motor stopped (PWM detached + pin HIGH). Waiting 2 seconds before changing direction...");
-
-      if (ledcAttached) {
-        ledcWrite(MOTOR_PWM_PIN, 0); // Остановка через PWM
-        Serial.println("Motor stopped (PWM set to 0).");
-      } else {
-        // Если уже detach, установите пин в состояние, соответствующее остановке
-        digitalWrite(MOTOR_PWM_PIN, LOW); // или HIGH, в зависимости от схемы
-        Serial.println("Motor stopped (pin state set, LEDC not attached).");
-      }
-    }
-  } else {
-    if (currentTime - stopStartTime >= stopDuration) {
-      motorDirection = !motorDirection;
-      digitalWrite(MOTOR_DIR_PIN, motorDirection);
-      Serial.print("Direction changed to ");
-      Serial.println(motorDirection ? "FORWARD" : "BACKWARD");
-
-      if (!ledcAttached) {
-         if (ledcAttach(MOTOR_PWM_PIN, PWM_FREQ, PWM_RESOLUTION_BITS)) {
-            Serial.println("LEDC re-attached to pin.");
-            ledcAttached = true;
-         } else {
-            Serial.println("Error: Failed to re-attach LEDC for pin " + String(MOTOR_PWM_PIN));
-         }
-      }
-
-      if (ledcAttached) {
-          ledcWrite(MOTOR_PWM_PIN, motorSpeed);
-          Serial.println("Motor restarted with new direction.");
-      } else {
-          Serial.println("Cannot restart motor: LEDC not attached.");
-      }
-
-
-      motorIsStopping = false;
-      lastDirectionChange = currentTime;
-    }
-  }
-
-  if (currentTime - lastSerialPrint >= serialPrintInterval) {
-    Serial.print("Encoder Position: ");
-    Serial.print(encoderCount);
-    Serial.print(motorIsStopping ? "0" : (ledcAttached ? String(motorSpeed) : "NA"));
-    Serial.print(" | Direction: ");
-    Serial.print(motorDirection ? "FORWARD" : "BACKWARD");
-    Serial.print(" | State: ");
-    Serial.print(motorIsStopping ? "STOPPING" : "RUNNING");
-    Serial.print(" | LEDC: ");
-    Serial.println(ledcAttached ? "Attached" : "Detached");
-    lastSerialPrint = currentTime;
-  }
-
+    unint_motor_move(3.0, 1, 200);
+    delay(2000);
+    unint_motor_move(3.0, -1, 200);
+    delay(2000);
 }
 

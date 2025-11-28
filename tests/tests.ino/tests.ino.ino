@@ -12,35 +12,46 @@ const int PWM_CHANNEL = 0; // Канал LEDC
 volatile long encoderCount = 0;
 bool ledcAttached = false;
 
-// --- Функции управления мотором ---
-void setMotorSpeed(int speed, int direction) {
-  // speed: 0-255
-  // direction: 0 или 1
-  
-  digitalWrite(MOTOR_DIR_PIN, direction);
-  
-  if (!ledcAttached) {
-    if (ledcAttach(MOTOR_PWM_PIN, PWM_FREQ, PWM_RESOLUTION_BITS)) {
-      ledcAttached = true;
-      Serial.println("LEDC attached");
-    }
-  }
-  
-  if (ledcAttached) {
-    ledcWrite(MOTOR_PWM_PIN, speed);
-  }
-  
-  Serial.print("Motor: Speed=");
-  Serial.print(speed);
-  Serial.print(" (");
-  Serial.print((speed * 100) / 255);
-  Serial.print("%), DIR=");
-  Serial.println(direction ? "HIGH" : "LOW");
+bool motorMoveTaskActive = false;
+int current_motor_dir = 0;
+
+
+void IRAM_ATTR encoderISR() {
+  encoderCount += current_motor_dir;
 }
 
-// --- Обработчик прерывания ---
-void IRAM_ATTR encoderISR() {
-  encoderCount++;
+void set_motor_speed(int speed, int direction) {
+    assert(speed >= 0 && speed <= 255);
+    assert(direction == 0 || direction == 1);
+    
+    if (speed > 0) {
+        current_motor_dir = (direction == 1) ? 1 : -1;
+    }
+    
+    digitalWrite(MOTOR_DIR_PIN, direction);
+
+    if (!ledcAttached) {
+        if (ledcAttach(MOTOR_PWM_PIN, PWM_FREQ, PWM_RESOLUTION_BITS)) {
+            ledcAttached = true;
+        }
+    }
+
+    if (ledcAttached) {
+        ledcWrite(MOTOR_PWM_PIN, speed);
+    }
+    
+    Serial.print("Motor: Speed=");
+    Serial.print(speed);
+    Serial.print(", DIR=");
+    Serial.print(direction ? "HIGH" : "LOW");
+    Serial.print(", CurrentDir=");
+    Serial.println(current_motor_dir);
+}
+
+void stop_motor() {
+    set_motor_speed(0, 0);  // Скорость 0, но направление сохраняется
+    motorMoveTaskActive = false;
+    Serial.println("Motor STOPPED (direction preserved)");
 }
 
 void setup() {
@@ -72,7 +83,7 @@ void setup() {
   Serial.println("---");
   
   // Начальная остановка мотора
-  stopMotor();
+  stop_motor();
 }
 
 void loop() {
@@ -93,27 +104,28 @@ void loop() {
     
     switch(testPhase) {
       case 0: // Медленно вперед
-        setMotorSpeed(100, LOW);
+        set_motor_speed(100, LOW);
         Serial.println("Slow FORWARD");
         break;
       case 1: // Быстро вперед
-        setMotorSpeed(200, LOW);
+        set_motor_speed(200, LOW);
         Serial.println("Fast FORWARD");
         break;
       case 2: // Остановка
-        stopMotor();
+        stop_motor();
+        set_motor_speed(0, 0);
         Serial.println("STOP");
         break;
       case 3: // Медленно назад
-        setMotorSpeed(100, HIGH);
+        set_motor_speed(100, HIGH);
         Serial.println("Slow BACKWARD");
         break;
       case 4: // Быстро назад
-        setMotorSpeed(200, HIGH);
+        set_motor_speed(200, HIGH);
         Serial.println("Fast BACKWARD");
         break;
       case 5: // Остановка
-        stopMotor();
+        stop_motor();
         Serial.println("STOP");
         break;
     }

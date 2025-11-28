@@ -47,12 +47,36 @@ TempSensor temp_sensors[SENSORS_COUNT] = {
 };
 
 void temp_sensors_setup() {
+    Serial.println("Инициализация датчиков температуры...");
+
     for (int i = 0; i < SENSORS_COUNT; i++) {
+        Serial.print("Настройка датчика ");
+        Serial.print(i);
+        Serial.print(" на пине ");
+        Serial.println(temp_sensors[i].pin);
+
+        // Настройка пина
         pinMode(temp_sensors[i].pin, INPUT_PULLUP);
+
+        // Создание объектов
         oneWires[i] = new OneWire(temp_sensors[i].pin);
         temp_sensors[i].sensor = new DallasTemperature(oneWires[i]);
+
+        // Инициализация библиотеки
         temp_sensors[i].sensor->begin();
-        temp_sensors[i].sensor->setResolution(RESOLUTION_BITS);
+
+        // Задержка для стабилизации
+        delay(20);
+
+        // Проверка подключения
+        int foundSensors = temp_sensors[i].sensor->getDeviceCount();
+        if (foundSensors > 0) {
+            temp_sensors[i].sensor->setResolution(RESOLUTION_BITS);
+            Serial.print("  ✓ Найдено датчиков: ");
+            Serial.println(foundSensors);
+        } else {
+            Serial.println("  ✗ Датчики не обнаружены!");
+        }
     }
 }
 
@@ -137,15 +161,12 @@ void temperature_sensors_update() {
 
 float get_sensor_recent_temp(int sensor_ind) {
     assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);
-    if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
-    DBG_PRINT();
-    Serial.println("sensor " + String(sensor_ind));
+    // DBG_PRINT();
     return temp_sensors[sensor_ind].last_tempC;
 }
 
 bool get_sensor_error(int sensor_ind) {
     assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);
-    if (sensor_ind > SENSORS_COUNT || sensor_ind < 0) {return false;}
     return temp_sensors[sensor_ind].error;
 }
 

@@ -186,7 +186,7 @@ void initializeSecondaryActionArray() {
 }
 
 void updateDisplay() {
-    DBG_PRINT();
+    // DBG_PRINT();
     int stateIdx = static_cast<int>(menu_ctx.state);
     if (stateIdx >= 0 && stateIdx < MENU_STATE_COUNT) {
         displayUpdateArray[stateIdx]();
@@ -244,7 +244,7 @@ void menu_setup() {
 // графика для меню ===========================================================================================================//
 
 void preview_upd() {
-    DBG_PRINT();
+    // DBG_PRINT();
 
     display_sensors();
     print_line("1-4: menu", 4);

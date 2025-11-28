@@ -1,8 +1,15 @@
 #pragma once
 
+const unsigned long DFLT_TIMEOUT = 10000;
+const int DFLT_SPEED = 150;
+
 void motor_setup();
 
-void setMotorMoveTask(float revolutions, int direction, int speed);
-void MotorExecMoveTask();
-void unint_motor_move(float revolutions, int direction, int speed, unsigned long timeout_ms = 10000);
+void setMotorMoveTask(unsigned long ticks, int direction, int speed);
+bool MotorExecMoveTask();
+bool unint_motor_move(unsigned long ticks, int direction, int speed = DFLT_SPEED, unsigned long timeout_ms = DFLT_TIMEOUT);
+
+int change_pos(int pos);
+int get_current_position_index();
+
 void motor_test();
