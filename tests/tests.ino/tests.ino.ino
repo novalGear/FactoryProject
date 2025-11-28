@@ -94,7 +94,7 @@ void loop() {
   unsigned long currentTime = millis();
 
   // Смена состояния каждые 3 секунды
-  if (currentTime - phaseStartTime >= 3000) {
+  if (currentTime - phaseStartTime >= 2000) {
     testPhase = (testPhase + 1) % 6;
     phaseStartTime = currentTime;
     
@@ -104,11 +104,11 @@ void loop() {
     
     switch(testPhase) {
       case 0: // Медленно вперед
-        set_motor_speed(100, LOW);
+        set_motor_speed(50, LOW);
         Serial.println("Slow FORWARD");
         break;
       case 1: // Быстро вперед
-        set_motor_speed(200, LOW);
+        set_motor_speed(100, LOW);
         Serial.println("Fast FORWARD");
         break;
       case 2: // Остановка
@@ -117,11 +117,11 @@ void loop() {
         Serial.println("STOP");
         break;
       case 3: // Медленно назад
-        set_motor_speed(100, HIGH);
+        set_motor_speed(50, HIGH);
         Serial.println("Slow BACKWARD");
         break;
       case 4: // Быстро назад
-        set_motor_speed(200, HIGH);
+        set_motor_speed(100, HIGH);
         Serial.println("Fast BACKWARD");
         break;
       case 5: // Остановка

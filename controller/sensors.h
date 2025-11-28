@@ -5,7 +5,14 @@ const int SENSORS_COUNT = 3;    // общее количество датчик�
 void temp_sensors_setup();
 void temperature_sensors_update();
 
+float get_room_temp();
+float get_outside_temp();
+
 float get_sensor_recent_temp(int sensor_ind);
+
+bool get_room_sensor_error();
+bool get_outside_sensor_error();
+
 bool  get_sensor_error(int sensor_ind);
 
 void co2_sensor_setup();

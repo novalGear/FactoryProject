@@ -72,13 +72,13 @@ void set_motor_speed(int speed, int direction) {
 
     digitalWrite(MOTOR_DIR_PIN, direction);
     ledcWrite(MOTOR_PWM_PIN, speed);
-
-    Serial.print("Motor: Speed=");
-    Serial.print(speed);
-    Serial.print(", DIR=");
-    Serial.print(direction ? "HIGH" : "LOW");
-    Serial.print(", CurrentDir=");
-    Serial.println(current_motor_dir);
+//
+//     Serial.print("Motor: Speed=");
+//     Serial.print(speed);
+//     Serial.print(", DIR=");
+//     Serial.print(direction ? "HIGH" : "LOW");
+//     Serial.print(", CurrentDir=");
+//     Serial.println(current_motor_dir);
 }
 
 void detach_motor_pwm() {
@@ -199,11 +199,11 @@ bool MotorExecMoveTask() {
     long currentDisplacement = encoderCount - initialencoderCount;
     long absoluteDisplacement = abs(currentDisplacement);
 
-    // ДЛЯ ОТЛАДКИ - выводим реальные значения
-    Serial.println("DEBUG: curr=" + String(encoderCount) +
-                  ", init=" + String(initialencoderCount) +
-                  ", disp=" + String(currentDisplacement) +
-                  ", target=" + String(targetTickCount));
+    // // ДЛЯ ОТЛАДКИ - выводим реальные значения
+    // Serial.println("DEBUG: curr=" + String(encoderCount) +
+    //               ", init=" + String(initialencoderCount) +
+    //               ", disp=" + String(currentDisplacement) +
+    //               ", target=" + String(targetTickCount));
 
     if (absoluteDisplacement >= targetTickCount) {
         stop_motor();
@@ -234,6 +234,10 @@ bool unint_motor_move(unsigned long ticks, int direction, int speed, unsigned lo
         // Проверка таймаута
         if (timeout_ms > 0 && (millis() - startTime) > timeout_ms) {
             stop_motor();
+            long currentDisplacement = encoderCount - initialencoderCount;
+            long absoluteDisplacement = abs(currentDisplacement);
+            lastStoppedEncoderCount = encoderCount;
+            Serial.println("Move COMPLETED. Ticks: " + String(absoluteDisplacement));
             Serial.println("Motor move TIMEOUT!");
             return false;
         }
@@ -280,9 +284,9 @@ int get_current_position_index() {
 // Testing ======================================================================================================================//
 
 void motor_test() {
-    unint_motor_move(3.0, 1, 200);
+    unint_motor_move(300, 1, 200);
     delay(2000);
-    unint_motor_move(3.0, -1, 200);
+    unint_motor_move(300, -1, 200);
     delay(2000);
 }
 

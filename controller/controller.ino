@@ -9,6 +9,7 @@ WindowController windowController;
 TelegramBot telegramBot;
 void setup() {
     Serial.begin(115200);
+    motor_setup();
 
     OLED_screen_setup();
     temp_sensors_setup();
@@ -16,12 +17,14 @@ void setup() {
 
     telegramBot.init();
 
-    motor_setup();
     buttons_setup();
     menu_setup();               // обязательно после сенсоров и дисплея
+
+    unint_motor_move(2000, 0, 100);
 }
 
 void loop() {
+    return;
     windowController.update();
     updateDisplay();            // здесь обновляем данные для дисплея
     display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей

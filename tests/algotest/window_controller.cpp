@@ -1,5 +1,5 @@
 #include "window_controller.h"
-#include "sensors.h"
+#include "sensor_sim.h"
 #include <cmath>
 #include <Arduino.h>
 
@@ -147,26 +147,22 @@ float WindowController::PositionHistory::getTotalWeight(unsigned long currentTim
 }
 
 // логика управления ============================================================================================================//
-
 void WindowController::update() {
     unsigned long currentTime = millis();
 
-    // 1. Проверка экстренных условий (каждые 10 секунд)
-    if (currentTime - lastEmergencyCheckTime >= emergencyConfig.emergencyCheckInterval) {
-        EmergencyType emergency = checkEmergencyConditions();
+    // Убрать проверку интервалов - выполняем всегда
+    EmergencyType emergency = checkEmergencyConditions();
 
-        if (emergency != EmergencyType::NONE) {
-            handleEmergency(emergency);
+    if (emergency != EmergencyType::NONE) {
+        handleEmergency(emergency);
+    }
+    else if (currentMode == WindowMode::EMERGENCY) {
+        // Мгновенный выход из аварийного режима
+        if (shouldExitEmergencyMode(currentTime)) {
+            currentEmergency = EmergencyType::NONE;  // ЭТА ПЕРЕМЕННАЯ ТЕПЕРЬ ОБЪЯВЛЕНА
+            setMode(WindowMode::AUTO);
+            Serial.println("Exiting emergency mode, returning to AUTO");
         }
-        else if (currentMode == WindowMode::EMERGENCY) {
-            // Проверяем, можно ли выйти из экстренного режима
-            if (shouldExitEmergencyMode(currentTime)) {
-                setMode(WindowMode::AUTO);
-                Serial.println("Exiting emergency mode, returning to AUTO");
-            }
-        }
-
-        lastEmergencyCheckTime = currentTime;
     }
 
     // Если в экстренном режиме - пропускаем обычную логику
@@ -174,39 +170,33 @@ void WindowController::update() {
         return;
     }
 
-    // 2. Обычная работа (сбор данных и принятие решений)
-    if (currentTime - lastDataCollectionTime >= DATA_COLLECTION_INTERVAL) {
-        collectData(currentTime);
-        lastDataCollectionTime = currentTime;
-    }
+    // Всегда собираем данные и принимаем решения
+    collectData(currentTime);
 
-    if (currentTime - lastDecisionTime >= DECISION_INTERVAL) {
-        float currentMetric = calculateTotalMetric();
-        float metricTrend = calculateMetricTrend(currentTime);
-        float predictedMetric = currentMetric + metricTrend * config.predictionTime;
+    float currentMetric = calculateTotalMetric();
+    float metricTrend = calculateMetricTrend(currentTime);
+    float predictedMetric = currentMetric + metricTrend * config.predictionTime;
 
-        Serial.print("Metrics: curr=");
-        Serial.print(currentMetric, 2);
-        Serial.print(", pred=");
-        Serial.print(predictedMetric, 2);
+    Serial.print("Metrics: curr=");
+    Serial.print(currentMetric, 2);
+    Serial.print(", pred=");
+    Serial.print(predictedMetric, 2);
 
-        switch(currentMode) {
-            case WindowMode::AUTO:
-                makeDecisionAuto(currentTime, currentMetric, predictedMetric);
-                break;
-            case WindowMode::BINARY:
-                makeDecisionBinary(currentMetric);
-                break;
-            case WindowMode::SHORT_TERM:
-                makeDecisionShortTerm(currentMetric);
-                break;
-            case WindowMode::MANUAL:
-                Serial.println(" - MANUAL mode");
-                break;
-            default:
-                break;
-        }
-        lastDecisionTime = currentTime;
+    switch(currentMode) {
+        case WindowMode::AUTO:
+            makeDecisionAuto(currentTime, currentMetric, predictedMetric);
+            break;
+        case WindowMode::BINARY:
+            makeDecisionBinary(currentMetric);
+            break;
+        case WindowMode::SHORT_TERM:
+            makeDecisionShortTerm(currentMetric);
+            break;
+        case WindowMode::MANUAL:
+            Serial.println(" - MANUAL mode");
+            break;
+        default:
+            break;
     }
 }
 

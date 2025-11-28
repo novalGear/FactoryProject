@@ -46,6 +46,9 @@ TempSensor temp_sensors[SENSORS_COUNT] = {
     { .pin = 23,  .sensor = nullptr, .last_tempC = 0.0, .error = false }
 };
 
+const unsigned long ROOM_SENSOR_INDEX = 0;
+const unsigned long OUTSIDE_SENSOR_INDEX = 1;
+
 void temp_sensors_setup() {
     Serial.println("Инициализация датчиков температуры...");
 
@@ -159,11 +162,28 @@ void temperature_sensors_update() {
     }
 }
 
+float get_room_temp() {
+    return get_sensor_recent_temp(ROOM_SENSOR_INDEX);
+}
+
+float get_outside_temp() {
+    return get_sensor_recent_temp(OUTSIDE_SENSOR_INDEX);
+}
+
 float get_sensor_recent_temp(int sensor_ind) {
     assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);
     // DBG_PRINT();
     return temp_sensors[sensor_ind].last_tempC;
 }
+
+bool get_room_sensor_error() {
+    return get_sensor_error(ROOM_SENSOR_INDEX);
+}
+
+bool get_outside_sensor_error() {
+    return get_sensor_error(OUTSIDE_SENSOR_INDEX);
+}
+
 
 bool get_sensor_error(int sensor_ind) {
     assert(sensor_ind < SENSORS_COUNT && sensor_ind >= 0);

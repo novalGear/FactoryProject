@@ -1,0 +1,80 @@
+20:26:09.755 -> === INSTANT Window Controller Simulation ===
+20:26:09.755 -> Single run mode: ON
+20:26:09.789 -> Simulation setup complete
+20:26:09.789 -> Test scenario length: 12
+20:26:09.789 -> Motor simulation setup complete
+20:26:09.789 -> Instant simulation ready. Running full scenario...
+20:26:09.789 -> =================================================
+
+
+20:26:09.789 -> Simulation step 1/11: Room=22.5°C, Outside=18.0°C, CO2=800ppm
+20:26:09.789 -> Data collected: pos=0, metric=3.70, time=40
+20:26:09.789 -> Metrics: curr=3.70, pred=3.70  Pos 0: base_metric=3.70, adjusted_metric=3.70, weight=1.00 - NEW BEST
+20:26:09.831 -> AUTO: No better position found
+
+
+20:26:09.923 -> Simulation step 2/11: Room=23.0°C, Outside=18.0°C, CO2=1200ppm
+20:26:09.923 -> Data collected: pos=0, metric=10.40, time=151
+20:26:09.923 -> Metrics: curr=10.40, pred=10.40 - AUTO: No action needed
+
+
+20:26:10.000 -> Simulation step 3/11: Room=24.0°C, Outside=20.0°C, CO2=1000ppm
+20:26:10.047 -> Data collected: pos=0, metric=8.80, time=262
+20:26:10.047 -> Metrics: curr=8.80, pred=-2585.79  Pos 0: base_metric=7.63, adjusted_metric=7.63, weight=3.00 - NEW BEST
+20:26:10.047 -> AUTO: No better position found
+
+
+20:26:10.125 -> Simulation step 4/11: Room=25.0°C, Outside=22.0°C, CO2=900ppm
+20:26:10.125 -> Data collected: pos=0, metric=8.70, time=373
+20:26:10.125 -> Metrics: curr=8.70, pred=-153.46  Pos 0: base_metric=7.90, adjusted_metric=7.90, weight=4.00 - NEW BEST
+20:26:10.125 -> AUTO: No better position found
+
+
+20:26:10.264 -> Simulation step 5/11: Room=26.0°C, Outside=22.0°C, CO2=800ppm
+20:26:10.264 -> Data collected: pos=0, metric=8.60, time=484
+20:26:10.264 -> Metrics: curr=8.60, pred=-153.56  Pos 0: base_metric=8.04, adjusted_metric=8.04, weight=5.00 - NEW BEST
+20:26:10.264 -> AUTO: No better position found
+
+
+20:26:10.342 -> Simulation step 6/11: Room=24.0°C, Outside=20.0°C, CO2=600ppm
+20:26:10.342 -> Data collected: pos=0, metric=2.80, time=595
+20:26:10.342 -> Metrics: curr=2.80, pred=-9402.61  Pos 0: base_metric=7.17, adjusted_metric=7.17, weight=6.00 - NEW BEST
+20:26:10.387 -> AUTO: No better position found
+
+
+20:26:10.453 -> Simulation step 7/11: Room=22.0°C, Outside=10.0°C, CO2=500ppm
+20:26:10.453 -> Data collected: pos=0, metric=0.00, time=706
+20:26:10.453 -> Metrics: curr=0.00, pred=-4540.54  Pos 0: base_metric=6.14, adjusted_metric=6.14, weight=7.00 - NEW BEST
+20:26:10.497 -> AUTO: No better position found
+
+
+20:26:10.590 -> Simulation step 8/11: Room=21.0°C, Outside=8.0°C, CO2=600ppm
+20:26:10.590 -> Data collected: pos=0, metric=1.40, time=817
+20:26:10.590 -> Metrics: curr=1.40, pred=2271.67  Pos 0: base_metric=5.55, adjusted_metric=5.55, weight=8.00 - NEW BEST
+20:26:10.590 -> AUTO: No better position found
+
+
+20:26:10.670 -> Simulation step 9/11: Room=28.0°C, Outside=25.0°C, CO2=1500ppm
+20:26:10.670 -> Data collected: pos=0, metric=21.90, time=928
+20:26:10.670 -> Metrics: curr=21.90, pred=33265.14  Pos 0: base_metric=7.37, adjusted_metric=7.37, weight=9.00 - NEW BEST
+20:26:10.714 -> AUTO: No better position found
+
+
+20:26:10.807 -> Simulation step 10/11: Room=15.0°C, Outside=5.0°C, CO2=1800ppm
+20:26:10.807 -> Data collected: pos=0, metric=27.80, time=1039
+20:26:10.807 -> Metrics: curr=27.80, pred=9595.36  Pos 0: base_metric=9.41, adjusted_metric=9.41, weight=10.00 - NEW BEST
+20:26:10.807 -> AUTO: No better position found
+
+
+20:26:10.880 -> Simulation step 11/11: Room=22.0°C, Outside=18.0°C, CO2=500ppm
+20:26:10.916 -> Data collected: pos=0, metric=0.00, time=1150
+20:26:10.916 -> Metrics: curr=0.00, pred=-45081.08  Pos 0: base_metric=8.55, adjusted_metric=8.55, weight=11.00 - NEW BEST
+20:26:10.916 -> AUTO: No better position found
+20:26:10.991 -> === SIMULATION FINISHED ===
+20:26:11.026 -> EMERGENCY: Critical CO2 level: 1074604808ppm
+20:26:11.026 -> CO2 EMERGENCY: Full opening for ventilation
+20:26:11.026 -> Motor moving from 0 to 9
+20:26:11.026 -> Motor instantly moved to position: 9
+20:26:11.026 -> Changing mode from 1 to 4
+20:26:11.103 -> === FULL SIMULATION COMPLETED ===
+20:26:11.150 -> All test scenarios executed.

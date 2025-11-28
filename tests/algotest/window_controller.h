@@ -2,8 +2,8 @@
 
 #include <deque>
 
-#include "sensors.h"
-#include "motor_impl.h"
+#include "sensor_sim.h"
+#include "motor_sim.h"
 
 enum class EmergencyType {
     NONE,
@@ -128,6 +128,7 @@ private:
         unsigned long emergencyCheckInterval = 10000; // Проверка каждые 10 секунд
     } emergencyConfig;
 
+    EmergencyType currentEmergency = EmergencyType::NONE;
     unsigned long emergencyStartTime = 0;
     const unsigned long CO2_EMERGENCY_DURATION = 300000; // 5 минут для CO2
     const unsigned long TEMP_EMERGENCY_DURATION = 600000; // 10 минут для температуры
