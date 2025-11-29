@@ -95,53 +95,17 @@ void TelegramBot::handleMessages(WindowController& windowController) {
         numNewMessages = bot->getUpdates(bot->last_message_received + 1);
     }
 }
-void TelegramBot::sendStatusLog(String chat_id, WindowController& windowController) {
-    windowController.updateRecentData();
-    WindowConfig config = windowController.getConfig();
-    RecentData recentData = windowController.getRecentData();
 
-    String message = "**ТЕКУЩИЕ ПОКАЗАНИЯ СИСТЕМЫ**\n\n";
+void TelegramBot::sendStatusLog(String chat_id, WindowController& controller) {
+    RecentData data = controller.getRecentData();
+    String message = "=== System Status ===\n";
+    message += "Temperature: " + String(data.temperature, 1) + "°C\n";
+    message += "Outside: " + String(data.outsideTemp, 1) + "°C\n";
+    message += "CO2: " + String(data.co2) + " ppm\n";  // data.co2 теперь существует
+    message += "Window: " + String(data.windowPosition) + "/9\n";
+    message += "Total Metric: " + String(data.totalMetric, 1);
 
-    // Реальные данные с датчиков
-    message += "**ДАННЫЕ С ДАТЧИКОВ:**\n";
-    message += "Температура: " + String(recentData.temperature, 1) + "°C";
-    if (recentData.tempSensorError) message += " ⚠️(ошибка датчика)";
-    message += "\n";
-
-    message += "CO2: " + String(recentData.co2, 0) + " ppm";
-    if (recentData.co2SensorError) message += " ⚠️(ошибка датчика)";
-    message += "\n\n";
-
-    // Рассчитанные метрики
-    message += "**РАСЧЕТНЫЕ МЕТРИКИ:**\n";
-    message += "Общая метрика: " + String(recentData.totalMetric, 2) + "\n";
-    message += "Метрика температуры: " + String(recentData.temperatureMetric, 2) + "\n";
-    message += "Метрика CO2: " + String(recentData.co2Metric, 2) + "\n\n";
-
-    // Состояние системы
-    message += "⚙️ **СОСТОЯНИЕ СИСТЕМЫ:**\n";
-    message += "Позиция окна: " + String(recentData.windowPosition) + "/9\n";
-    message += "Целевая метрика: " + String(config.metricTarget, 1) + "\n";
-    message += "Допуск: ±" + String(config.metricMargin, 1) + "\n\n";
-
-    // Настройки
-    message += "**НАСТРОЙКИ:**\n";
-    message += "Идеальная температура: " + String(config.tempIdeal, 1) + "°C\n";
-    message += "Идеальный CO2: " + String(config.co2Ideal) + " ppm\n";
-
-    // Статус ошибок
-    message += "\n🔧 **СТАТУС:** ";
-    if (recentData.tempSensorError || recentData.co2SensorError) {
-        message += "⚠️ Есть ошибки датчиков";
-    } else {
-        message += "✅ Норма";
-    }
-
-    // Время обновления
-    unsigned long secondsAgo = (millis() - recentData.timestamp) / 1000;
-    message += "\n🕒 Данные обновлены: " + String(secondsAgo) + " сек назад";
-
-    bot->sendMessage(chat_id, message, "Markdown");
+    bot->sendMessage(chat_id, message, "");
 }
 
 void TelegramBot::showSettingsMenu(String chat_id, WindowController& windowController) {

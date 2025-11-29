@@ -41,13 +41,24 @@ void WindowController::setManualPosition(int position) {
 float WindowController::getCurrentPosition() const {
     return get_current_position_index() / (float)POSITION_LEVELS;
 }
+
 void WindowController::updateRecentData() {
+    unsigned long currentTime = millis();
+
     // Обновляем комнатную температуру
     recentData.tempSensorError = get_room_sensor_error();
     if (!recentData.tempSensorError) {
         recentData.temperature = get_room_temp();
     } else {
         recentData.temperature = NAN;
+        Serial.println("WARNING: Room temperature sensor error");
+    }
+
+    // Обновляем наружную температуру
+    recentData.outsideTemp = get_outside_temp();
+    recentData.outsideSensorError = get_outside_sensor_error();
+    if (recentData.outsideSensorError) {
+        Serial.println("WARNING: Outside temperature sensor error");
     }
 
     // Обновляем CO2
@@ -55,7 +66,8 @@ void WindowController::updateRecentData() {
     if (!recentData.co2SensorError) {
         recentData.co2 = get_last_co2_ppm();
     } else {
-        recentData.co2 = NAN;
+        recentData.co2 = -1;
+        Serial.println("WARNING: CO2 sensor error");
     }
 
     // Рассчитываем метрики
@@ -65,24 +77,47 @@ void WindowController::updateRecentData() {
 
     // Позиция окна
     recentData.windowPosition = get_current_position_index();
-    recentData.timestamp = millis();
+    recentData.timestamp = currentTime;
+
+    // Логируем обновление (для отладки)
+    // static unsigned long lastLogTime = 0;
+    // if (currentTime - lastLogTime > 5000) { // Логируем каждые 5 секунд
+    //     Serial.print("RecentData updated: Room=");
+    //     Serial.print(recentData.temperature, 1);
+    //     Serial.print("°C, Outside=");
+    //     Serial.print(recentData.outsideTemp, 1);
+    //     Serial.print("°C, CO2=");
+    //     Serial.print(recentData.co2);
+    //     Serial.print("ppm, Window=");
+    //     Serial.print(recentData.windowPosition);
+    //     Serial.print(", TotalMetric=");
+    //     Serial.println(recentData.totalMetric, 2);
+    //     lastLogTime = currentTime;
+    // }
 }
 
-// Обновляем collectData чтобы использовать updateRecentData
 void WindowController::collectData(unsigned long currentTime) {
     updateRecentData(); // Сначала обновляем данные
 
-    int positionIndex = recentData.windowPosition; // Используем уже рассчитанное
-    float currentMetric = recentData.totalMetric;  // Используем уже рассчитанное
-
-    positionHistories[positionIndex].addRecord(currentMetric, currentTime);
-
-    Serial.print("Data collected: pos=");
-    Serial.print(positionIndex);
-    Serial.print(", metric=");
-    Serial.print(currentMetric, 2);
-    Serial.print(", time=");
-    Serial.println(currentTime);
+    // НЕ записываем в positionHistories - мы ее больше не используем
+    // Просто логируем сбор данных
+    Serial.print("RecentData: ");
+    Serial.print("Temp=");
+    Serial.print(recentData.temperature, 1);
+    Serial.print("°C, Outside=");
+    Serial.print(recentData.outsideTemp, 1);
+    Serial.print("°C, CO2=");
+    Serial.print(recentData.co2);
+    Serial.print("ppm, TempMetric=");
+    Serial.print(recentData.temperatureMetric, 2);
+    Serial.print(", CO2Metric=");
+    Serial.print(recentData.co2Metric, 2);
+    Serial.print(", TotalMetric=");
+    Serial.print(recentData.totalMetric, 2);
+    Serial.print(", Window=");
+    Serial.print(recentData.windowPosition);
+    Serial.print(", Time=");
+    Serial.println(recentData.timestamp);
 }
 
 // metrics ======================================================================================================================//
@@ -108,6 +143,9 @@ float WindowController::calculateCO2Metric() {
 float WindowController::calculateTotalMetric() {
     float tempMetric = calculateTemperatureMetric();
     float co2Metric = calculateCO2Metric();
+//
+//     Serial.println("tempMetric: " + String(tempMetric));
+//     Serial.println("co2Metric: "  + String(co2Metric));
     return (tempMetric * config.tempWeight) + (co2Metric * config.co2Weight);
 }
 
@@ -147,22 +185,29 @@ float WindowController::PositionHistory::getTotalWeight(unsigned long currentTim
 }
 
 // логика управления ============================================================================================================//
+void WindowController::tick() {
+    update();
+}
+
 void WindowController::update() {
-    unsigned long currentTime = millis();
+    virtualTime++;
 
-    // Убрать проверку интервалов - выполняем всегда
-    EmergencyType emergency = checkEmergencyConditions();
+    // 1. Проверка экстренных условий (каждые 10 тиков)
+    if (virtualTime - lastEmergencyCheckTime >= 10) {
+        EmergencyType emergency = checkEmergencyConditions();
 
-    if (emergency != EmergencyType::NONE) {
-        handleEmergency(emergency);
-    }
-    else if (currentMode == WindowMode::EMERGENCY) {
-        // Мгновенный выход из аварийного режима
-        if (shouldExitEmergencyMode(currentTime)) {
-            currentEmergency = EmergencyType::NONE;  // ЭТА ПЕРЕМЕННАЯ ТЕПЕРЬ ОБЪЯВЛЕНА
-            setMode(WindowMode::AUTO);
-            Serial.println("Exiting emergency mode, returning to AUTO");
+        if (emergency != EmergencyType::NONE) {
+            handleEmergency(emergency);
         }
+        else if (currentMode == WindowMode::EMERGENCY) {
+            if (shouldExitEmergencyMode(virtualTime)) {
+                currentEmergency = EmergencyType::NONE;
+                setMode(WindowMode::AUTO);
+                Serial.println("Exiting emergency mode, returning to AUTO");
+            }
+        }
+
+        lastEmergencyCheckTime = virtualTime;
     }
 
     // Если в экстренном режиме - пропускаем обычную логику
@@ -170,33 +215,58 @@ void WindowController::update() {
         return;
     }
 
-    // Всегда собираем данные и принимаем решения
-    collectData(currentTime);
+    // 2. Сбор данных при каждом тике
+    if (virtualTime - lastDataCollectionTime >= DATA_COLLECTION_INTERVAL) {
+        collectData(virtualTime);
+        lastDataCollectionTime = virtualTime;
 
-    float currentMetric = calculateTotalMetric();
-    float metricTrend = calculateMetricTrend(currentTime);
-    float predictedMetric = currentMetric + metricTrend * config.predictionTime;
+        // Обновляем буфер последних измерений
+        updateRecentMetrics(recentData.totalMetric);
+    }
 
-    Serial.print("Metrics: curr=");
-    Serial.print(currentMetric, 2);
-    Serial.print(", pred=");
-    Serial.print(predictedMetric, 2);
+    // 3. Принятие решений только каждые 6 тиков
+    if (virtualTime - lastDecisionTime >= DECISION_INTERVAL) {
+        float currentMetric = recentData.totalMetric;
+        float metricTrend = calculateMetricTrend();
+        float predictedMetric = currentMetric + metricTrend * 18; // Прогноз на 18 тиков вперед
 
-    switch(currentMode) {
-        case WindowMode::AUTO:
-            makeDecisionAuto(currentTime, currentMetric, predictedMetric);
-            break;
-        case WindowMode::BINARY:
-            makeDecisionBinary(currentMetric);
-            break;
-        case WindowMode::SHORT_TERM:
-            makeDecisionShortTerm(currentMetric);
-            break;
-        case WindowMode::MANUAL:
-            Serial.println(" - MANUAL mode");
-            break;
-        default:
-            break;
+        Serial.print("=== DECISION AT TICK ");
+        Serial.print(virtualTime);
+        Serial.print(" ===");
+        Serial.print(" Current: ");
+        Serial.print(currentMetric, 2);
+        Serial.print(", Trend: ");
+        Serial.print(metricTrend, 3);
+        Serial.print("/tick, Predicted: ");
+        Serial.print(predictedMetric, 2);
+        Serial.println(" ===");
+
+        // Отладочная информация о последних измерениях
+        Serial.print("Recent metrics: ");
+        for (int i = 0; i < recentMetricsCount; i++) {
+            int idx = (recentMetricsIndex - recentMetricsCount + i + RECENT_METRICS_SIZE) % RECENT_METRICS_SIZE;
+            Serial.print(recentMetrics[idx], 1);
+            Serial.print(" ");
+        }
+        Serial.println();
+
+        switch(currentMode) {
+            case WindowMode::AUTO:
+                make_decision_auto_ST(virtualTime, currentMetric, predictedMetric);
+                break;
+            case WindowMode::BINARY:
+                makeDecisionBinary(currentMetric);
+                break;
+            case WindowMode::SHORT_TERM:
+                makeDecisionShortTerm(currentMetric);
+                break;
+            case WindowMode::MANUAL:
+                Serial.println("MANUAL mode - no auto decisions");
+                break;
+            default:
+                break;
+        }
+        lastDecisionTime = virtualTime;
     }
 }
 
@@ -217,6 +287,102 @@ bool WindowController::shouldExitEmergencyMode(unsigned long currentTime) {
 
     // Минимальное время в аварийном режиме
     return (currentTime - emergencyStartTime >= TEMP_EMERGENCY_DURATION);
+}
+
+bool WindowController::need2Improve(float metric) {
+    // Serial.println();
+    // Serial.println("metric: " + String(metric));
+    // Serial.println("target:" + String(config.metricTarget));
+    // Serial.println(metric - config.metricTarget);
+    // Serial.println(config.metricMargin);
+    // Serial.println((metric - config.metricTarget) > config.metricMargin);
+    return (metric - config.metricTarget) > config.metricMargin;
+}
+
+void WindowController::make_decision_auto_ST(unsigned long currentTime, float currentMetric, float predictedMetric) {
+    // Определяем необходимость улучшения
+    if (!need2Improve(currentMetric)) {
+        Serial.println("Good metric (" + String(currentMetric) + "), no actions needed");
+        return;
+    } else if (!need2Improve(predictedMetric)) {
+        Serial.println("Good trend (" + String(currentMetric) + "->" + String(predictedMetric) + "), metric will stabilize soon");
+        return;
+    }
+
+    // Обновляем данные
+    updateRecentData();
+
+    // Получаем текущую позицию
+    int currentPosition = recentData.windowPosition;
+
+    // 1. Рассчитываем "полезность" открытия и закрытия
+    float openBenefit = 0.0f;
+    float closeBenefit = 0.0f;
+
+    // Вклад CO2
+    if (recentData.co2 > config.co2Ideal && !recentData.co2SensorError) {
+        float co2Excess = recentData.co2 - config.co2Ideal;
+        openBenefit += (co2Excess / 100.0f) * 10.0f;
+        closeBenefit -= (co2Excess / 100.0f) * 5.0f;
+    }
+
+    // Вклад температуры
+    if (!recentData.outsideSensorError) {
+        float tempDiff = recentData.outsideTemp - recentData.temperature;
+        float roomToIdeal = config.tempIdeal - recentData.temperature;
+
+        if (recentData.temperature > config.tempIdeal && tempDiff < 0) {
+            // Жарко в комнате, холодно снаружи - открытие охладит
+            openBenefit += abs(roomToIdeal) * 2.0f;
+            closeBenefit -= abs(roomToIdeal) * 1.0f;
+        }
+        else if (recentData.temperature < config.tempIdeal && tempDiff > 0) {
+            // Холодно в комнате, тепло снаружи - открытие нагреет
+            openBenefit += abs(roomToIdeal) * 2.0f;
+            closeBenefit -= abs(roomToIdeal) * 1.0f;
+        }
+        else {
+            // Открытие ухудшит температурные условия
+            openBenefit -= abs(roomToIdeal) * 1.0f;
+            closeBenefit += abs(roomToIdeal) * 2.0f;
+        }
+    }
+
+    Serial.print("  Direction analysis: openBenefit=");
+    Serial.print(openBenefit, 2);
+    Serial.print(", closeBenefit=");
+    Serial.print(closeBenefit, 2);
+
+    // 2. Определяем направление движения
+    const float MIN_BENEFIT_THRESHOLD = 3.0f;
+    int direction = 0; // 0 = остаться, 1 = открыть, -1 = закрыть
+
+    if (openBenefit - closeBenefit > MIN_BENEFIT_THRESHOLD) {
+        direction = 1;
+        Serial.println(" - DECISION: OPEN");
+    }
+    else if (closeBenefit - openBenefit > MIN_BENEFIT_THRESHOLD) {
+        direction = -1;
+        Serial.println(" - DECISION: CLOSE");
+    }
+    else {
+        Serial.println(" - DECISION: HOLD");
+        return;
+    }
+
+    // 3. Выполняем движение на одну позицию
+    int newPosition = currentPosition + direction;
+    newPosition = constrain(newPosition, 0, POSITION_LEVELS - 1);
+
+    if (newPosition != currentPosition) {
+        Serial.print("  Moving from ");
+        Serial.print(currentPosition);
+        Serial.print(" to ");
+        Serial.println(newPosition);
+        change_pos(newPosition);
+
+        // НЕ записываем в историю позиций - мы ее больше не используем
+    }
 }
 
 void WindowController::makeDecisionAuto(unsigned long currentTime, float currentMetric, float predictedMetric) {
@@ -257,16 +423,21 @@ void WindowController::makeDecisionShortTerm(float currentMetric) {
 
 void WindowController::takeActionAuto(unsigned long currentTime, float currentMetric, float predictedMetric) {
     bool needToImprove = predictedMetric > config.metricTarget + config.metricMargin;
-    int bestPosition = findBestPosition(currentTime, needToImprove);
-    int currentPosition = get_current_position_index();
 
-    if (bestPosition != -1 && bestPosition != currentPosition) {
-        Serial.print("AUTO: Moving to position ");
-        Serial.println(bestPosition);
-        change_pos(bestPosition);
-    } else {
-        Serial.println("AUTO: No better position found");
-    }
+//     // Используем новую short-term логику вместо исторической
+//     int bestPosition = find_best_pos_ST(needToImprove, currentMetric, predictedMetric);
+//     int currentPosition = get_current_position_index();
+//
+//     if (bestPosition != -1 && bestPosition != currentPosition) {
+//         Serial.print("AUTO: Moving to position ");
+//         Serial.println(bestPosition);
+//         change_pos(bestPosition);
+//
+//         // Записываем решение в историю для будущего обучения
+//         positionHistories[bestPosition].addRecord(currentMetric, currentTime);
+//     } else {
+//         Serial.println("AUTO: No better position found");
+//     }
 }
 
 void WindowController::takeActionBinary(float currentMetric) {
@@ -302,6 +473,8 @@ void WindowController::takeActionShortTerm(float currentMetric) {
 }
 
 // поиск наилучшей позиции ======================================================================================================//
+
+
 int WindowController::findBestPosition(unsigned long currentTime, bool needToImprove) const {
     int bestPosition = -1;
     float bestMetric = needToImprove ? 1000.0f : -1000.0f;
@@ -374,7 +547,7 @@ int WindowController::findBestPosition(unsigned long currentTime, bool needToImp
                 bestPosition = i;
                 Serial.println(" - NEW BEST");
             } else {
-                Serial.println();
+                // Serial.println();
             }
         }
     }
@@ -382,23 +555,26 @@ int WindowController::findBestPosition(unsigned long currentTime, bool needToImp
     return bestPosition;
 }
 
-float WindowController::calculateMetricTrend(unsigned long currentTime) const {
-    int currentPosIndex = get_current_position_index();
-    const PositionHistory& history = positionHistories[currentPosIndex];
+void WindowController::updateRecentMetrics(float metric) {
+    recentMetrics[recentMetricsIndex] = metric;
+    recentMetricsIndex = (recentMetricsIndex + 1) % RECENT_METRICS_SIZE;
+    if (recentMetricsCount < RECENT_METRICS_SIZE) {
+        recentMetricsCount++;
+    }
+}
 
-    if (history.count < 3) return 0.0f;
+float WindowController::calculateMetricTrend() const {
+    if (recentMetricsCount < 2) return 0.0f;
 
-    int lastIndex = (history.head - 1 + HISTORY_SIZE) % HISTORY_SIZE;
-    int prevIndex = (history.head - 2 + HISTORY_SIZE) % HISTORY_SIZE;
+    // Простой расчет тренда: разница между последним и первым измерением
+    int firstIndex = (recentMetricsIndex - recentMetricsCount + RECENT_METRICS_SIZE) % RECENT_METRICS_SIZE;
+    int lastIndex = (recentMetricsIndex - 1 + RECENT_METRICS_SIZE) % RECENT_METRICS_SIZE;
 
-    float lastMetric = history.records[lastIndex].metric;
-    float prevMetric = history.records[prevIndex].metric;
-    unsigned long lastTime = history.records[lastIndex].timestamp;
-    unsigned long prevTime = history.records[prevIndex].timestamp;
+    float firstMetric = recentMetrics[firstIndex];
+    float lastMetric = recentMetrics[lastIndex];
 
-    if (lastTime == prevTime) return 0.0f;
-
-    return (lastMetric - prevMetric) / ((lastTime - prevTime) / 1000.0f);
+    // Тренд = изменение за (recentMetricsCount - 1) тиков
+    return (lastMetric - firstMetric) / (recentMetricsCount - 1);
 }
 
 // emergencies ==================================================================================================================//

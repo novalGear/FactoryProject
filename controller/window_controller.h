@@ -22,36 +22,38 @@ enum class WindowMode {
 };
 
 struct RecentData {
-    float temperature;          // Последняя измеренная температура
-    float co2;                  // Последний измеренный CO2
+    float temperature;          // Последняя измеренная температура в комнате
+    float outsideTemp;          // Температура снаружи
+    int co2;                    // Уровень CO2
     float temperatureMetric;    // Рассчитанная метрика температуры
-    float co2Metric;            // Рассчитанная метрика CO2
-    float totalMetric;          // Общая метрика
-    int windowPosition;         // Текущая позиция окна (0-9)
-    bool tempSensorError;       // Ошибка датчиков температуры
-    bool co2SensorError;        // Ошибка датчика CO2
-    unsigned long timestamp;    // Время последнего измерения
+    float co2Metric;           // Рассчитанная метрика CO2
+    float totalMetric;         // Общая метрика
+    int windowPosition;        // Текущая позиция окна (0-9)
+    bool tempSensorError;      // Ошибка датчика температуры в комнате
+    bool outsideSensorError;   // Ошибка датчика температуры снаружи
+    bool co2SensorError;       // Ошибка датчика CO2
+    unsigned long timestamp;   // Время последнего измерения
 };
 
 struct WindowConfig {
     // Основные параметры управления
-    float metricTarget = 20.0f;
-    float metricMargin = 10.0f;
+    float metricTarget = 0.0f;
+    float metricMargin = 20.0f;
     float predictionTime = 180.0f;
 
     // Параметры температурной метрики
     float tempIdeal = 22.0f;           // Идеальная температура
-    float tempWeightMultiplier = 2.0f; // Множитель для метрики температуры
+    float tempWeightMultiplier = 3.5f; // Множитель для метрики температуры
     float tempErrorFallback = 50.0f;   // Значение при ошибке датчиков
 
     // Параметры CO2 метрики
     int co2Ideal = 600;                // Идеальный CO2
-    float co2WeightDivisor = 20.0f;    // Делитель для метрики CO2
+    float co2WeightDivisor = 60.0f;    // Делитель для метрики CO2
     float co2ErrorFallback = 30.0f;    // Значение при ошибке датчика
 
     // Веса метрик
-    float tempWeight = 0.7f;
-    float co2Weight = 0.3f;
+    float tempWeight = 1.0f;
+    float co2Weight = 1.0f;
 
     // Аварийные параметры
     float tempCriticalHigh = 30.0f;
@@ -105,6 +107,9 @@ private:
 
     // Private methods
     void collectData(unsigned long currentTime);
+    bool need2Improve(float metric);
+
+    void make_decision_auto_ST(unsigned long currentTime, float currentMetric, float predictedMetric);
     void makeDecisionAuto(unsigned long currentTime, float currentMetric, float predictedMetric);
     void makeDecisionBinary(float currentMetric);
     void makeDecisionShortTerm(float currentMetric);

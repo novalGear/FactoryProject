@@ -14,14 +14,6 @@ void setup() {
 
     // Настройка контроллера
     WindowConfig config;
-    config.tempIdeal = 22.0f;
-    config.tempWeightMultiplier = 2.0f;
-    config.co2Ideal = 600;
-    config.co2WeightDivisor = 20.0f;
-    config.tempWeight = 0.7f;
-    config.co2Weight = 0.3f;
-    config.metricTarget = 20.0f;
-    config.metricMargin = 10.0f;
 
     windowController.setConfig(config);
     windowController.setMode(WindowMode::AUTO);
@@ -32,21 +24,54 @@ void setup() {
 
 void loop() {
     if (is_simulation_finished()) {
-        // Симуляция завершена
         static bool finished_reported = false;
         if (!finished_reported) {
-            Serial.println("=== FULL SIMULATION COMPLETED ===");
-            Serial.println("All test scenarios executed.");
+            Serial.println("=== FULL TEST COMPLETED ===");
+            Serial.println("Total steps: " + String(test_scenario_length));
+            Serial.println("Check if system:");
+            Serial.println("1. Reacted to high CO2 by opening window");
+            Serial.println("2. Reacted to overheating when outside is cooler");
+            Serial.println("3. Found balance between temperature and CO2");
+            Serial.println("4. Remained stable during ideal conditions");
+            Serial.println("5. Handled rapid changes without oscillations");
             finished_reported = true;
         }
         return;
     }
 
+    // Компактный вывод с группировкой по сериям
+    int currentStep = get_simulation_data_index();
+    
+    Serial.println();
+    Serial.print("Step");
+    Serial.print(currentStep % 6);
+    Serial.print(": ");
+
     // Один вызов = один шаг симуляции
     update_simulation(millis());
     motor_simulation_update(millis());
-    windowController.update();
+    windowController.tick();
+    
+    RecentData data = windowController.getRecentData();
 
-    // Короткая пауза для читаемости логов
-    delay(100);
+    // Выводим заголовок для каждой новой серии из 6 значений
+    if (currentStep % 6 == 0) {
+        Serial.println();
+        Serial.print("=== SERIES ");
+        Serial.print(currentStep / 6 + 1);
+        Serial.println(" ===");
+    }
+
+    // Компактный вывод для каждого шага
+
+    // Показываем решение если было движение
+    static int lastPosition = -1;
+    if (data.windowPosition != lastPosition) {
+        Serial.print(" -> MOVED to ");
+        Serial.print(data.windowPosition);
+        lastPosition = data.windowPosition;
+    }
+    Serial.println();
+
+    delay(30); // Еще быстрее для больших тестов
 }

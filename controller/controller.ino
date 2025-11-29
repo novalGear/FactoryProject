@@ -20,11 +20,11 @@ void setup() {
     buttons_setup();
     menu_setup();               // обязательно после сенсоров и дисплея
 
-    unint_motor_move(2000, 0, 100);
+    // unint_motor_move(2000, 0, 100);
 }
 
 void loop() {
-    return;
+    // return;
     windowController.update();
     updateDisplay();            // здесь обновляем данные для дисплея
     display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
