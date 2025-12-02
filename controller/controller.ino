@@ -9,8 +9,10 @@ WindowController windowController;
 TelegramBot telegramBot;
 void setup() {
     Serial.begin(115200);
-    motor_setup();
 
+    delay(1000);
+
+    motor_setup();
     OLED_screen_setup();
     temp_sensors_setup();
     co2_sensor_setup();
@@ -20,21 +22,38 @@ void setup() {
     buttons_setup();
     menu_setup();               // обязательно после сенсоров и дисплея
 
-    // unint_motor_move(2000, 0, 100);
+
+    windowController.setMode(WindowMode::MANUAL);
+    windowController.setManualPosition(3);
+    Serial.println(get_encoder());
+    delay(1000);
+    windowController.setManualPosition(6);
+    Serial.println(get_encoder());
+    delay(1000);
+    windowController.setManualPosition(3);
+    
+    delay(1000);
+
+
 }
 
 void loop() {
+    static unsigned long last_print = 0;
+    if (millis() - last_print > 100 ) {
+        Serial.println(get_encoder());
+        last_print = millis();
+    }
     // return;
-    windowController.update();
-    updateDisplay();            // здесь обновляем данные для дисплея
-    display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
-
-    buttons_update();
-    temperature_sensors_update();
-    co2_sensor_update();
-
-    telegramBot.update(windowController);
-    delay(5000); // Основной цикл каждые 5 секунд
+//     windowController.update();
+//     updateDisplay();            // здесь обновляем данные для дисплея
+//     display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
+//
+//     buttons_update();
+//     temperature_sensors_update();
+//     co2_sensor_update();
+//
+//     telegramBot.update(windowController);
+//     delay(5000); // Основной цикл каждые 5 секунд
 }
 
 void log_system_status(float metric) {

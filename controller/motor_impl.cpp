@@ -44,6 +44,10 @@ void updateStoppedPosition() {
     lastStoppedEncoderCount = encoderCount;
 }
 
+long get_encoder() {
+    return encoderCount;
+}
+
 // Forward declaration
 
 void stop_motor();
@@ -228,26 +232,26 @@ bool MotorExecMoveTask() {
  */
 bool unint_motor_move(unsigned long ticks, int direction, int speed, unsigned long timeout_ms) {
     setMotorMoveTask(ticks, direction, speed);
+
     unsigned long startTime = millis();
     Serial.println("motor init encoder position: " + String(encoderCount));
-    while(MotorExecMoveTask()) {
+
+    while (MotorExecMoveTask()) {
+        // Кормим WDT
+        vTaskDelay(1); // корректно для FreeRTOS, лучше чем delay()
+
         // Проверка таймаута
         if (timeout_ms > 0 && (millis() - startTime) > timeout_ms) {
-            stop_motor();
-            long currentDisplacement = encoderCount - initialencoderCount;
-            long absoluteDisplacement = abs(currentDisplacement);
-            lastStoppedEncoderCount = encoderCount;
-            Serial.println("Move COMPLETED. Ticks: " + String(absoluteDisplacement));
             Serial.println("Motor move TIMEOUT!");
+            stop_motor();
+            // lastStoppedEncoderCount = encoderCount;
             return false;
         }
-
-        // Короткая задержка для стабильности
-        delay(1);
     }
+
     stop_motor();
-    // Короткая пауза для стабилизации после остановки
-    delay(50);
+    // lastStoppedEncoderCount = encoderCount;
+    delay(30); // небольшая стабилизация
     return true;
 }
 
@@ -259,23 +263,53 @@ void cancelMotorMoveTask() {
 // discrete control =============================================================================================================//
 
 unsigned long pos2ticks(int pos) {
-    if (pos == curr_pos_ind)    { return 0;  }
-    if (pos > MAX_POS)          { return -1; }
-    return (MAX_MOTOR_POS / MAX_POS) * pos;
+    const unsigned long step = MAX_MOTOR_POS / MAX_POS;
+    return step * abs(pos - curr_pos_ind);
 }
 
 int dir2pos(int pos) {
-    return ((pos - curr_pos_ind) > 0 ) ? 1 : 0;
+    return (pos > curr_pos_ind) ? 1 : 0;
 }
 
 int change_pos(int pos) {
-    if (pos == curr_pos_ind)    { return 0;  }
-    if (pos > MAX_POS)          { return -1; }
+    if (pos == curr_pos_ind) {
+        Serial.println("pos = curr");
+        return 0;
+    }
+    if (pos > MAX_POS) {
+        Serial.println("pos out of range");
+        return -1;
+    }
 
+    // вычисляем количество тиков
     unsigned long ticks = pos2ticks(pos);
+
+    // направление 0/1
     int direction = dir2pos(pos);
-    unint_motor_move(ticks, direction);
+
+    Serial.print("change_pos(): curr=");
+    Serial.print(curr_pos_ind);
+    Serial.print(" -> ");
+    Serial.print(pos);
+    Serial.print(" | ticks=");
+    Serial.print(ticks);
+    Serial.print(" dir=");
+    Serial.println(direction);
+
+    // выполняем движение
+    bool ok = unint_motor_move(ticks, direction);
+
+    if (!ok) {
+        Serial.println("Error: movement failed.");
+        return -1;
+    }
+
+    // обновляем состояние
+    curr_pos_ind = pos;
+
+    return 0;
 }
+
 
 int get_current_position_index() {
     return curr_pos_ind;
@@ -286,7 +320,7 @@ int get_current_position_index() {
 void motor_test() {
     unint_motor_move(300, 1, 200);
     delay(2000);
-    unint_motor_move(300, -1, 200);
+    unint_motor_move(300, 0, 200);
     delay(2000);
 }
 

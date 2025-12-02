@@ -147,6 +147,7 @@ private:
     void emergencyFullOpen();
 
 public:
+    // unsigned get_encoder("");
     void setMode(WindowMode newMode);
     void setManualPosition(int position);
     void updateRecentData();

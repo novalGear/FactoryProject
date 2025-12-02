@@ -5,6 +5,10 @@ const int DFLT_SPEED = 150;
 
 void motor_setup();
 
+
+
+long get_encoder();
+
 void setMotorMoveTask(unsigned long ticks, int direction, int speed);
 bool MotorExecMoveTask();
 bool unint_motor_move(unsigned long ticks, int direction, int speed = DFLT_SPEED, unsigned long timeout_ms = DFLT_TIMEOUT);
