@@ -23,37 +23,26 @@ void setup() {
     menu_setup();               // обязательно после сенсоров и дисплея
 
 
-    windowController.setMode(WindowMode::MANUAL);
-    windowController.setManualPosition(3);
-    Serial.println(get_encoder());
-    delay(1000);
-    windowController.setManualPosition(6);
-    Serial.println(get_encoder());
-    delay(1000);
-    windowController.setManualPosition(3);
-    
-    delay(1000);
-
-
+    performHoming(1);
 }
 
 void loop() {
-    static unsigned long last_print = 0;
-    if (millis() - last_print > 100 ) {
-        Serial.println(get_encoder());
-        last_print = millis();
-    }
+    // static unsigned long last_print = 0;
+    // if (millis() - last_print > 100 ) {
+    //     Serial.println(get_encoder());
+    //     last_print = millis();
+    // }
     // return;
-//     windowController.update();
-//     updateDisplay();            // здесь обновляем данные для дисплея
-//     display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
-//
-//     buttons_update();
-//     temperature_sensors_update();
-//     co2_sensor_update();
-//
-//     telegramBot.update(windowController);
-//     delay(5000); // Основной цикл каждые 5 секунд
+    windowController.update();
+    updateDisplay();            // здесь обновляем данные для дисплея
+    display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
+
+    buttons_update();
+    temperature_sensors_update();
+    co2_sensor_update();
+
+    telegramBot.update(windowController);
+    // delay(5000); // Основной цикл каждые 5 секунд
 }
 
 void log_system_status(float metric) {

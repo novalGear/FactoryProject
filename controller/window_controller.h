@@ -43,7 +43,7 @@ struct WindowConfig {
 
     // Параметры температурной метрики
     float tempIdeal = 22.0f;           // Идеальная температура
-    float tempWeightMultiplier = 3.5f; // Множитель для метрики температуры
+    float tempWeightMultiplier = 5.0f; // Множитель для метрики температуры
     float tempErrorFallback = 50.0f;   // Значение при ошибке датчиков
 
     // Параметры CO2 метрики
@@ -61,7 +61,8 @@ struct WindowConfig {
     int co2CriticalHigh = 2000;
     unsigned long emergencyCheckInterval = 10000;
 
-     WindowMode defaultMode = WindowMode::AUTO;
+    WindowMode currentMode = WindowMode::AUTO;
+    WindowMode defaultMode = WindowMode::AUTO;
 
     // Параметры для BINARY режима
     float binaryOpenThreshold = 30.0f;
@@ -74,7 +75,6 @@ struct WindowConfig {
 
 class WindowController {
 private:
-    WindowMode currentMode = WindowMode::AUTO;
     RecentData recentData;
     WindowConfig config;
 
@@ -82,8 +82,8 @@ private:
 
     static const int POSITION_LEVELS = 10;
     static const int HISTORY_SIZE = 180;
-    static const unsigned long DECISION_INTERVAL = 60000;
-    static const unsigned long DATA_COLLECTION_INTERVAL = 60000;
+    static const unsigned long DECISION_INTERVAL = 60 * 1000;
+    static const unsigned long DATA_COLLECTION_INTERVAL = 60 * 1000;
     static constexpr float MIN_WEIGHT_THRESHOLD = 0.1f;
 
     struct MetricRecord {
@@ -149,13 +149,13 @@ private:
 public:
     // unsigned get_encoder("");
     void setMode(WindowMode newMode);
-    void setManualPosition(int position);
+    bool setManualPosition(int position);
     void updateRecentData();
     WindowController() = default;
     void update();
     float getCurrentPosition() const;
 
-    RecentData getRecentData() const { return recentData; }
+    RecentData getRecentData() { updateRecentData(); return recentData; }
     void setConfig(const WindowConfig& newConfig) {
         config = newConfig;
     }

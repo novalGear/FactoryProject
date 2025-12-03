@@ -10,14 +10,14 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 }
 
 void WindowController::setMode(WindowMode newMode) {
-    if (currentMode == newMode) return;
+    if (config.currentMode == newMode) return;
 
     Serial.print("Changing mode from ");
-    Serial.print(static_cast<int>(currentMode));
+    Serial.print(static_cast<int>(config.currentMode));
     Serial.print(" to ");
     Serial.println(static_cast<int>(newMode));
 
-    currentMode = newMode;
+    config.currentMode = newMode;
 
     // Сброс состояния при смене режима
     if (newMode == WindowMode::SHORT_TERM) {
@@ -27,14 +27,14 @@ void WindowController::setMode(WindowMode newMode) {
 
 // работа с датчиками и мотором =================================================================================================//
 
-void WindowController::setManualPosition(int position) {
-    if (currentMode != WindowMode::MANUAL) {
+bool WindowController::setManualPosition(int position) {
+    if (config.currentMode != WindowMode::MANUAL) {
         Serial.println("Warning: Setting manual position while not in MANUAL mode");
     }
     position = constrain(position, 0, POSITION_LEVELS - 1);
     Serial.print("MANUAL: Setting position to ");
     Serial.println(position);
-    change_pos(position);
+    return (bool)change_pos(position);
 }
 
 
@@ -185,7 +185,7 @@ void WindowController::update() {
         if (emergency != EmergencyType::NONE) {
             handleEmergency(emergency);
         }
-        else if (currentMode == WindowMode::EMERGENCY) {
+        else if (config.currentMode == WindowMode::EMERGENCY) {
             // Проверяем, можно ли выйти из экстренного режима
             if (shouldExitEmergencyMode(currentTime)) {
                 setMode(WindowMode::AUTO);
@@ -197,7 +197,7 @@ void WindowController::update() {
     }
 
     // Если в экстренном режиме - пропускаем обычную логику
-    if (currentMode == WindowMode::EMERGENCY) {
+    if (config.currentMode == WindowMode::EMERGENCY) {
         return;
     }
 
@@ -217,7 +217,7 @@ void WindowController::update() {
         Serial.print(", pred=");
         Serial.print(predictedMetric, 2);
 
-        switch(currentMode) {
+        switch(config.currentMode) {
             case WindowMode::AUTO:
                 make_decision_auto_ST(currentTime, currentMetric, predictedMetric);
                 break;

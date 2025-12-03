@@ -58,6 +58,7 @@ void set_motor_speed(int speed, int direction);
 void stop_motor() {
     set_motor_speed(0, 0);
     motorMoveTaskActive = false;
+    resetEncoderVelocityCalculation();
     Serial.println("Motor STOPPED (direction preserved)");
 }
 
@@ -268,7 +269,7 @@ unsigned long pos2ticks(int pos) {
 }
 
 int dir2pos(int pos) {
-    return (pos > curr_pos_ind) ? 1 : 0;
+    return (pos > curr_pos_ind) ? 0 : 1;
 }
 
 int change_pos(int pos) {
@@ -313,6 +314,200 @@ int change_pos(int pos) {
 
 int get_current_position_index() {
     return curr_pos_ind;
+}
+
+// HOMING =======================================================================================================================//
+
+// Добавьте эти константы в начало файла после других констант
+const int HOMING_SPEED = 100;            // Скорость хоуминга (0-255)
+const int HOMING_MIN_VELOCITY = 100;     // Минимальная скорость энкодера для остановки хоуминга
+const unsigned long HOMING_TIMEOUT_MS = 10000;  // Таймаут хоуминга 10 секунд
+const unsigned long VELOCITY_SAMPLE_PERIOD = 100;  // Период измерения скорости (мс)
+
+// Добавьте глобальные переменные для расчета скорости
+unsigned long lastEncoderSampleTime = 0;
+long lastEncoderCount = 0;
+float currentEncoderVelocity = 0.0;      // Текущая скорость энкодера в тиках/секунду
+
+// ===================================================================
+// Функция calculateEncoderVelocity - расчет скорости энкодера
+// ===================================================================
+/**
+ * @brief Рассчитывает текущую скорость энкодера
+ * @return Скорость в тиках/секунду
+ */
+float calculateEncoderVelocity() {
+    unsigned long currentTime = millis();
+
+    if (lastEncoderSampleTime == 0) {
+        // Первый вызов
+        lastEncoderSampleTime = currentTime;
+        return HOMING_MIN_VELOCITY + 1;
+    }
+
+    // Вычисляем дельту времени
+    unsigned long deltaTime = currentTime - lastEncoderSampleTime;
+
+    if (deltaTime < VELOCITY_SAMPLE_PERIOD) {
+        // Не прошло достаточно времени для измерения
+        return currentEncoderVelocity;
+    }
+
+    // Вычисляем дельту тиков
+    long deltaTicks = encoderCount - lastEncoderCount;
+
+    // Рассчитываем скорость (тиков/секунду)
+    currentEncoderVelocity = (deltaTicks * 1000.0) / deltaTime;
+
+    // Обновляем значения для следующего расчета
+    lastEncoderSampleTime = currentTime;
+    lastEncoderCount = encoderCount;
+
+    return currentEncoderVelocity;
+}
+
+// ===================================================================
+// Функция resetEncoderVelocityCalculation - сброс расчета скорости
+// ===================================================================
+/**
+ * @brief Сбрасывает расчет скорости энкодера
+ */
+void resetEncoderVelocityCalculation() {
+    lastEncoderSampleTime = 0;
+    lastEncoderCount = encoderCount;
+    currentEncoderVelocity = 0.0;
+}
+// ===================================================================
+// Функция performHoming - выполнение процедуры хоуминга
+// ===================================================================
+/**
+ * @brief Выполняет процедуру хоуминга мотора
+ * @param homingDirection Направление хоуминга (0 или 1)
+ * @return true - хоуминг успешен, false - таймаут или ошибка
+ *
+ * Алгоритм:
+ * 1. Двигает мотор в указанном направлении с HOMING_SPEED
+ * 2. Постоянно отслеживает скорость энкодера
+ * 3. Когда скорость падает ниже HOMING_MIN_VELOCITY, останавливаем мотор
+ * 4. Сбрасывает encoderCount в 0
+ * 5. Имеет таймаут HOMING_TIMEOUT_MS
+ */
+bool performHoming(int homingDirection) {
+    assert(homingDirection == 0 || homingDirection == 1);
+
+    Serial.println("=== STARTING HOMING PROCEDURE ===");
+    Serial.print("Direction: ");
+    Serial.println(homingDirection == 1 ? "FORWARD" : "BACKWARD");
+    Serial.println("Moving until encoder velocity drops below " + String(HOMING_MIN_VELOCITY) + " ticks/sec");
+
+    cancelMotorMoveTask();
+    resetEncoderVelocityCalculation();
+
+    unsigned long startTime = millis();
+    unsigned long lastPrintTime = 0;
+
+    // Сначала ждем немного, чтобы мотор начал движение
+    Serial.println("Starting motor...");
+    set_motor_speed(HOMING_SPEED, homingDirection);
+
+    // Даем мотору время разогнаться
+    delay(300);
+
+    bool homingSuccessful = false;
+    bool timeoutReached = false;
+
+    // Флаг для пропуска первого измерения скорости (оно будет некорректным)
+    bool firstMeasurementSkipped = false;
+
+    while (!homingSuccessful && !timeoutReached) {
+        if (millis() - startTime > HOMING_TIMEOUT_MS) {
+            Serial.println("HOMING TIMEOUT after " + String(HOMING_TIMEOUT_MS) + "ms");
+            timeoutReached = true;
+            break;
+        }
+
+        float velocity = calculateEncoderVelocity();
+
+        // Пропускаем первое измерение (оно будет 0 или некорректным)
+        if (!firstMeasurementSkipped) {
+            firstMeasurementSkipped = true;
+            continue;
+        }
+
+        if (millis() - lastPrintTime > 500) {
+            Serial.print("Homing... Velocity: ");
+            Serial.print(velocity);
+            Serial.print(" ticks/sec, Encoder: ");
+            Serial.print(encoderCount);
+            Serial.print(", Time: ");
+            Serial.print((millis() - startTime) / 1000.0, 1);
+            Serial.println("s");
+            lastPrintTime = millis();
+        }
+
+        // Проверяем скорость (учитываем как положительные, так и отрицательные скорости)
+        float absVelocity = fabs(velocity);
+
+        if (absVelocity < HOMING_MIN_VELOCITY) {
+            // Скорость низкая - проверяем, что это не кратковременный сбой
+            delay(100); // Ждем больше для уверенности
+            velocity = calculateEncoderVelocity();
+            absVelocity = fabs(velocity);
+
+            if (absVelocity < HOMING_MIN_VELOCITY) {
+                // Скорость действительно упала - достигли упора
+                Serial.println("HOMING COMPLETE - Encoder velocity dropped to " + String(velocity) + " ticks/sec");
+
+                // Еще немного двигаемся, чтобы убедиться, что уперлись
+                delay(200);
+                stop_motor();
+                delay(300); // Ждем полной остановки
+
+                // Сбрасываем счетчик энкодера в 0
+                encoderCount = 0;
+                lastStoppedEncoderCount = 0;
+                initialencoderCount = 0;
+
+                // Обновляем текущую позицию
+                curr_pos_ind = 0;
+
+                Serial.println("Encoder counter RESET to 0");
+                homingSuccessful = true;
+
+                // Делаем небольшой отъезд от упора
+                Serial.println("Moving away from homing position...");
+                int oppositeDirection = homingDirection == 1 ? 0 : 1;
+                set_motor_speed(HOMING_SPEED / 2, oppositeDirection);
+                delay(300);
+                stop_motor();
+                delay(100);
+            }
+        }
+
+        // Короткая задержка для стабильности
+        vTaskDelay(1);
+    }
+
+    // Останавливаем мотор на всякий случай
+    stop_motor();
+
+    // Сбрасываем расчет скорости
+    resetEncoderVelocityCalculation();
+
+    if (timeoutReached) {
+        Serial.println("HOMING FAILED - Timeout reached");
+        return false;
+    }
+
+    if (homingSuccessful) {
+        Serial.println("=== HOMING PROCEDURE COMPLETED SUCCESSFULLY ===");
+        Serial.println("Current position: " + String(curr_pos_ind));
+        Serial.println("Encoder value: " + String(encoderCount));
+        return true;
+    }
+
+    Serial.println("HOMING FAILED - Unknown error");
+    return false;
 }
 
 // Testing ======================================================================================================================//

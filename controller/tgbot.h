@@ -23,7 +23,9 @@ private:
     void showSettingsMenu(String chat_id, WindowController& windowController);
     void handleParameterSetting(String chat_id, String command, WindowController& windowController);
     void sendNotAllowedMessage(String chat_id);
-
+    void showModeMenu(String chat_id, WindowController& windowController);
+    void setMode(String chat_id, WindowMode mode, WindowController& windowController);
+    void handleSetPosition(String chat_id, String command, WindowController& windowController);
 public:
     void init();
     void update(WindowController& windowController);
