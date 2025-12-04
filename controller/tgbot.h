@@ -20,7 +20,7 @@ private:
 
     bool isUserAllowed(String user_id);
     void sendNotAllowedMessage(String chat_id);
-
+    void sendStatusToAll(WindowController& windowController);
     void sendStatusLog(String chat_id, WindowController& windowController);
 
     void showSettingsMenu(String chat_id, WindowController& windowController);

@@ -128,6 +128,7 @@ private:
     float calculateCO2Metric();
 
     // emergencies ==============================================================================================================//
+
     struct EmergencyConfig {
         float tempCriticalHigh = 30.0f;
         float tempCriticalLow = 5.0f;
@@ -149,6 +150,7 @@ private:
     void emergencyFullOpen();
 
 public:
+    EmergencyType getLastEmergency();
     // unsigned get_encoder("");
     void setMode(WindowMode newMode);
     int setManualPosition(int position);

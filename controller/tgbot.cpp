@@ -54,13 +54,41 @@ void TelegramBot::sendNotAllowedMessage(String chat_id) {
     Serial.println("Попытка доступа от неавторизованного пользователя: " + chat_id);
 }
 
+void TelegramBot::sendStatusToAll(WindowController& windowController) {
+    for (const String& user_id : allowedUsers) {
+        // Защита от пустых ID
+        if (user_id.length() == 0) continue;
+
+        Serial.println("Отправка статуса пользователю: " + user_id);
+
+
+        String message = " EMERGENCY!!! \n";
+        bot->sendMessage(user_id, message, "Markdown");
+        sendStatusLog(user_id, windowController);
+
+        // ⚠️ Обязательная задержка между отправками!
+        // Telegram разрешает ~30 сообщений/сек на бота, но лучше — 1 сообщение/сек на чат
+        delay(1000); // 1 секунда
+    }
+}
 
 void TelegramBot::update(WindowController& windowController) {
+
+    static unsigned last_broadcast = -120 * 1000;
+    if (windowController.getLastEmergency() != EmergencyType::NONE) {
+
+        if (millis() - last_broadcast > 120 * 1000) {
+            last_broadcast = millis();
+            sendStatusToAll(windowController);
+        }
+    }
+
     if (millis() - lastUpdateTime > UPDATE_INTERVAL) {
         handleMessages(windowController);
         lastUpdateTime = millis();
     }
 }
+
 void TelegramBot::handleMessages(WindowController& windowController) {
     int numNewMessages = bot->getUpdates(bot->last_message_received + 1);
 
@@ -139,6 +167,11 @@ void TelegramBot::showModeMenu(String chat_id, WindowController& windowControlle
             message += "• 0 - полностью закрыто\n";
             message += "• 9 - полностью открыто\n";
             break;
+
+        case WindowMode::EMERGENCY:
+            message += " EMERGENCY!!!\n ";
+            message += " Check status to see the reason\n";
+
         default:
             message += "❓ **UNKNOWN**\n\n";
             break;

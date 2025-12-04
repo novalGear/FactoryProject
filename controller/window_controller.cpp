@@ -238,6 +238,11 @@ void WindowController::update() {
     }
 }
 
+EmergencyType WindowController::getLastEmergency() {
+    return lastEmergency;
+
+}
+
 bool WindowController::shouldExitEmergencyMode(unsigned long currentTime) {
     // Для CO2 аварии - ждем фиксированное время
     if (lastEmergency == EmergencyType::CO2_CRITICAL) {
