@@ -21,7 +21,7 @@ const unsigned long serialPrintInterval = 500;
 
 const int ENCODER_RESOLUTION = 256;                         // Глобальная константа для разрешения энкодера
 const unsigned long CRIT_THRESHOLD  = 10;                   // Критическое значение внешнего поворота
-const unsigned long MAX_MOTOR_POS   = 2000;                 // максимальное значение в ед. изм. энкодера
+const unsigned long MAX_MOTOR_POS   = 4000;                 // максимальное значение в ед. изм. энкодера
 const unsigned long MAX_POS         = 10;                   // число возможных позиций мотора
 
 static bool motorMoveTaskActive = false;                    // Флаг, указывающий, что выполняется задача поворота
@@ -319,9 +319,10 @@ int get_current_position_index() {
 // HOMING =======================================================================================================================//
 
 // Добавьте эти константы в начало файла после других констант
-const int HOMING_SPEED = 150;            // Скорость хоуминга (0-255)
-const int HOMING_MIN_VELOCITY = 100;     // Минимальная скорость энкодера для остановки хоуминга
-const unsigned long HOMING_TIMEOUT_MS = 10000;  // Таймаут хоуминга 10 секунд
+const int HOMING_DIR = 1;                   // направлени хоуминга
+const int HOMING_SPEED = 150;               // Скорость хоуминга (0-255)
+const int HOMING_MIN_VELOCITY = 130;        // Минимальная скорость энкодера для остановки хоуминга
+const unsigned long HOMING_TIMEOUT_MS = 15000;  // Таймаут хоуминга 10 секунд
 const unsigned long VELOCITY_SAMPLE_PERIOD = 100;  // Период измерения скорости (мс)
 
 // Добавьте глобальные переменные для расчета скорости
@@ -376,12 +377,13 @@ void resetEncoderVelocityCalculation() {
     lastEncoderSampleTime = 0;
     lastEncoderCount = encoderCount;
     currentEncoderVelocity = 0.0;
-}// ===================================================================
+}
+
+// ===================================================================
 // Функция performHoming - выполнение процедуры хоуминга
 // ===================================================================
 /**
  * @brief Выполняет процедуру хоуминга мотора
- * @param homingDirection Направление хоуминга (0 или 1)
  * @return true - хоуминг успешен, false - таймаут или ошибка
  *
  * Алгоритм:
@@ -391,12 +393,10 @@ void resetEncoderVelocityCalculation() {
  * 4. Сбрасывает encoderCount в 0
  * 5. Имеет таймаут HOMING_TIMEOUT_MS
  */
-int performHoming(int homingDirection) {
-    assert(homingDirection == 0 || homingDirection == 1);
-
+int performHoming() {
     Serial.println("=== STARTING HOMING PROCEDURE ===");
     Serial.print("Direction: ");
-    Serial.println(homingDirection == 1 ? "FORWARD" : "BACKWARD");
+    Serial.println(HOMING_DIR == 1 ? "FORWARD" : "BACKWARD");
     Serial.println("Moving until encoder velocity drops below " + String(HOMING_MIN_VELOCITY) + " ticks/sec");
 
     cancelMotorMoveTask();
@@ -408,7 +408,7 @@ int performHoming(int homingDirection) {
 
     // Запускаем мотор
     Serial.println("Starting motor...");
-    set_motor_speed(HOMING_SPEED, homingDirection);
+    set_motor_speed(HOMING_SPEED, HOMING_DIR);
 
     // Даем мотору больше времени на разгон в закрепленной конструкции
     Serial.println("Waiting for motor to start...");
@@ -468,7 +468,7 @@ int performHoming(int homingDirection) {
                 Serial.println("ERROR: Motor not moving. Trying with higher speed...");
 
                 // Пробуем увеличить скорость
-                set_motor_speed(HOMING_SPEED + 50, homingDirection);
+                set_motor_speed(HOMING_SPEED + 50, HOMING_DIR);
                 delay(1000);
                 velocity = calculateEncoderVelocity();
 
@@ -516,14 +516,14 @@ int performHoming(int homingDirection) {
 
                     Serial.println("Encoder counter RESET to 0");
                     homingSuccessful = true;
-
-                    // Делаем небольшой отъезд от упора
-                    Serial.println("Moving away from homing position...");
-                    int oppositeDirection = homingDirection == 1 ? 0 : 1;
-                    set_motor_speed(HOMING_SPEED / 2, oppositeDirection);
-                    delay(400);
-                    stop_motor();
-                    delay(200);
+//
+//                     // Делаем небольшой отъезд от упора
+//                     Serial.println("Moving away from homing position...");
+//                     int oppositeDirection = HOMING_DIR == 1 ? 0 : 1;
+//                     set_motor_speed(HOMING_SPEED / 2, oppositeDirection);
+//                     delay(400);
+//                     stop_motor();
+//                     delay(200);
                 }
             }
         }

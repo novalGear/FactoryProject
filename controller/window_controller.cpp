@@ -179,15 +179,16 @@ void WindowController::update() {
 
     // 1. Проверка экстренных условий (каждые 10 секунд)
     if (currentTime - lastEmergencyCheckTime >= emergencyConfig.emergencyCheckInterval) {
-        EmergencyType emergency = checkEmergencyConditions();
+        lastEmergency = checkEmergencyConditions();
 
-        if (emergency != EmergencyType::NONE) {
-            handleEmergency(emergency);
+        if (lastEmergency != EmergencyType::NONE) {
+            handleEmergency(lastEmergency);
         }
         else if (config.currentMode == WindowMode::EMERGENCY) {
             // Проверяем, можно ли выйти из экстренного режима
             if (shouldExitEmergencyMode(currentTime)) {
                 setMode(WindowMode::AUTO);
+                change_pos(5);
                 Serial.println("Exiting emergency mode, returning to AUTO");
             }
         }
@@ -195,16 +196,17 @@ void WindowController::update() {
         lastEmergencyCheckTime = currentTime;
     }
 
-    // Если в экстренном режиме - пропускаем обычную логику
-    if (config.currentMode == WindowMode::EMERGENCY) {
-        return;
-    }
-
     // 2. Обычная работа (сбор данных и принятие решений)
     if (currentTime - lastDataCollectionTime >= DATA_COLLECTION_INTERVAL) {
         collectData(currentTime);
         lastDataCollectionTime = currentTime;
     }
+
+    if (config.currentMode == WindowMode::EMERGENCY) {
+        return;
+    }
+
+    // Если в экстренном режиме - пропускаем обычную логику
 
     if (currentTime - lastDecisionTime >= DECISION_INTERVAL) {
         float currentMetric = calculateTotalMetric();
@@ -238,21 +240,22 @@ void WindowController::update() {
 
 bool WindowController::shouldExitEmergencyMode(unsigned long currentTime) {
     // Для CO2 аварии - ждем фиксированное время
-    if (currentTime - emergencyStartTime >= CO2_EMERGENCY_DURATION) {
-        return true;
+    if (lastEmergency == EmergencyType::CO2_CRITICAL) {
+        return (recentData.co2 < config.co2CriticalHigh) && (currentTime - emergencyStartTime >= CO2_EMERGENCY_DURATION);
     }
 
-    // Для температурных аварий - проверяем, нормализовалась ли температура
-    if (!get_room_sensor_error()) {
-        float roomTemp = get_room_temp();
-        if (roomTemp <= emergencyConfig.tempCriticalHigh &&
-            roomTemp >= emergencyConfig.tempCriticalLow) {
-            return true;
+    if ( (lastEmergency == EmergencyType::TEMP_CRITICAL_HELP) || (lastEmergency == EmergencyType::TEMP_CRITICAL_HARM) ) {
+        if (!get_room_sensor_error()) {
+            float roomTemp = get_room_temp();
+            if (roomTemp <= emergencyConfig.tempCriticalHigh &&
+                roomTemp >= emergencyConfig.tempCriticalLow) {
+                return true;
+            } else {
+                return false;
+            }
         }
     }
-
-    // Минимальное время в аварийном режиме
-    return (currentTime - emergencyStartTime >= TEMP_EMERGENCY_DURATION);
+    return true;
 }
 
 bool WindowController::need2Improve(float metric) {
@@ -652,11 +655,6 @@ void WindowController::handleSensorFailure() {
 void WindowController::emergencyFullOpen() {
     Serial.println("EMERGENCY: Moving to fully open position");
 
-    // Открываем на максимальную позицию (POSITION_LEVELS - 1)
     change_pos(POSITION_LEVELS - 1);
-
-    // Ждем завершения движения (блокирующе)
-    delay(5000); // Даем время на полное открытие
-
     Serial.println("EMERGENCY: Window fully opened");
 }

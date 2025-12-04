@@ -1,11 +1,12 @@
 #pragma once
 
-const unsigned long DFLT_TIMEOUT = 10000;
+const unsigned long DFLT_TIMEOUT = 20000;
 const int DFLT_SPEED = 150;
 
 void motor_setup();
 
 
+void stop_motor();
 
 long get_encoder();
 
@@ -19,4 +20,4 @@ int get_current_position_index();
 void motor_test();
 
 void resetEncoderVelocityCalculation();
-int performHoming(int homingDirection);
+int performHoming();

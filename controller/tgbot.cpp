@@ -272,7 +272,7 @@ void TelegramBot::handleHoming(String chat_id, WindowController& windowControlle
     bot->sendMessage(chat_id, message, "");
 
     // Выполняем хоуминг
-    int result = performHoming(0);
+    int result = performHoming();
 
     String resultMessage = "";
 

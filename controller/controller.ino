@@ -2,6 +2,7 @@
 #include "buttons.h"
 #include "sensors.h"
 #include "menu.h"
+#include "motor_impl.h"
 #include "window_controller.h"
 #include "tgbot.h"
 
@@ -23,7 +24,8 @@ void setup() {
     menu_setup();               // обязательно после сенсоров и дисплея
 
 
-    performHoming(1);
+    performHoming();
+    stop_motor();
 }
 
 void loop() {
@@ -41,6 +43,7 @@ void loop() {
     temperature_sensors_update();
     co2_sensor_update();
 
+    // telegramBot.loop();
     telegramBot.update(windowController);
     // delay(5000); // Основной цикл каждые 5 секунд
 }

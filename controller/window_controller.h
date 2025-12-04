@@ -75,6 +75,8 @@ struct WindowConfig {
 
 class WindowController {
 private:
+    EmergencyType lastEmergency;
+
     RecentData recentData;
     WindowConfig config;
 
@@ -134,8 +136,8 @@ private:
     } emergencyConfig;
 
     unsigned long emergencyStartTime = 0;
-    const unsigned long CO2_EMERGENCY_DURATION = 300000; // 5 минут для CO2
-    const unsigned long TEMP_EMERGENCY_DURATION = 600000; // 10 минут для температуры
+    const unsigned long CO2_EMERGENCY_DURATION = 60 * 1000; // 5 минут для CO2
+    const unsigned long TEMP_EMERGENCY_DURATION = 60 * 1000; // 10 минут для температуры
     unsigned long lastEmergencyCheckTime = 0;
 
     bool shouldExitEmergencyMode(unsigned long currentTime);
