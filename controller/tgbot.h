@@ -2,6 +2,7 @@
 
 #include "window_controller.h"
 #include "tgbotconfig.h"
+#include "motor_impl.h"
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -18,14 +19,21 @@ private:
     std::vector<String> allowedUsers = ::allowedUsers;  // Используем глобальный список
 
     bool isUserAllowed(String user_id);
-    void handleMessages(WindowController& windowController);
-    void sendStatusLog(String chat_id, WindowController& windowController);
-    void showSettingsMenu(String chat_id, WindowController& windowController);
-    void handleParameterSetting(String chat_id, String command, WindowController& windowController);
     void sendNotAllowedMessage(String chat_id);
+
+    void sendStatusLog(String chat_id, WindowController& windowController);
+
+    void showSettingsMenu(String chat_id, WindowController& windowController);
     void showModeMenu(String chat_id, WindowController& windowController);
+    void showWindowMenu(String chat_id, WindowController& windowController);
+
     void setMode(String chat_id, WindowMode mode, WindowController& windowController);
+
+    void handleMessages(WindowController& windowController);
+    void handleParameterSetting(String chat_id, String command, WindowController& windowController);
     void handleSetPosition(String chat_id, String command, WindowController& windowController);
+    void handleHoming(String chat_id, WindowController& windowController);
+
 public:
     void init();
     void update(WindowController& windowController);

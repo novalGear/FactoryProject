@@ -77,7 +77,7 @@ void TelegramBot::handleMessages(WindowController& windowController) {
                 welcome += "`/status` - текущие показания\n";
                 welcome += "`/settings` - настройки параметров\n";
                 welcome += "`/mode` - управление режимом работы\n";
-                welcome += "`/set_position N` - установить позицию окна (только в ручном режиме, N от 0 до 9)";
+                welcome += "`/window` - управление положением окна\n";
                 bot->sendMessage(chat_id, welcome, "Markdown");
             }
             else if (text == "/status") {
@@ -89,11 +89,17 @@ void TelegramBot::handleMessages(WindowController& windowController) {
             else if (text == "/mode") {
                 showModeMenu(chat_id, windowController);
             }
+            else if (text == "/window") {
+                showWindowMenu(chat_id, windowController);
+            }
             else if (text == "/mode_auto") {
                 setMode(chat_id, WindowMode::AUTO, windowController);
             }
             else if (text == "/mode_manual") {
                 setMode(chat_id, WindowMode::MANUAL, windowController);
+            }
+            else if (text == "/homing") {
+                handleHoming(chat_id, windowController);
             }
             else if (text.startsWith("/set_position ")) {
                 handleSetPosition(chat_id, text, windowController);
@@ -189,9 +195,9 @@ void TelegramBot::handleSetPosition(String chat_id, String command, WindowContro
     }
 
     // Устанавливаем позицию
-    bool success = windowController.setManualPosition(position);
+    int success = windowController.setManualPosition(position);
 
-    if (success) {
+    if (success >= 0) {
         String response = "✅ **Позиция окна изменена**\n\n";
         response += "Установлена позиция: **" + String(position) + "/9**\n";
 
@@ -211,6 +217,108 @@ void TelegramBot::handleSetPosition(String chat_id, String command, WindowContro
     } else {
         bot->sendMessage(chat_id, "❌ **Ошибка при установке позиции**\n\nНе удалось установить позицию окна.", "Markdown");
     }
+}
+
+
+void TelegramBot::showWindowMenu(String chat_id, WindowController& windowController) {
+    WindowConfig config = windowController.getConfig();
+    RecentData data = windowController.getRecentData();
+
+    String message = "🏠 **УПРАВЛЕНИЕ ОКНОМ**\n\n";
+
+    message += "**Текущее состояние:**\n";
+    message += "• Позиция: " + String(data.windowPosition) + "/9\n";
+    message += "• Режим: ";
+
+    switch (config.currentMode) {
+        case WindowMode::AUTO:
+            message += "AUTO (автоматический)";
+            break;
+        case WindowMode::MANUAL:
+            message += "MANUAL (ручной)";
+            break;
+        default:
+            message += "UNKNOWN";
+            break;
+    }
+
+    message += "\n\n**Доступные команды:**\n";
+
+    if (config.currentMode == WindowMode::MANUAL) {
+        message += "`/set_position N` - установить позицию (N от 0 до 9)\n";
+        message += "  0 - полностью закрыто\n";
+        message += "  9 - полностью открыто\n\n";
+    } else {
+        message += "⚠️ Ручное управление доступно только в режиме MANUAL\n";
+        message += "Используйте `/mode_manual` для переключения\n\n";
+    }
+
+    message += "`/homing` - выполнить процедуру калибровки (хоуминг)\n";
+    message += "• Сбрасывает счетчик энкодера\n";
+    message += "• Устанавливает нулевую позицию\n";
+    message += "• ⚠️ Требует свободного хода мотора\n\n";
+
+    message += "**Предупреждение:** Хоуминг может занять до 10 секунд.";
+
+    bot->sendMessage(chat_id, message, "Markdown");
+}
+
+void TelegramBot::handleHoming(String chat_id, WindowController& windowController) {
+    Serial.println("Получена команда /homing");
+
+    String message = "🔄 **НАЧАЛО ПРОЦЕДУРЫ КАЛИБРОВКИ**\n\n";
+    message += "Выполняется хоуминг мотора...\n";
+    message += "Пожалуйста, подождите (до 10 секунд).";
+    bot->sendMessage(chat_id, message, "");
+
+    // Выполняем хоуминг
+    int result = performHoming(0);
+
+    String resultMessage = "";
+
+    if (result >= 0) {
+        resultMessage = "✅ **КАЛИБРОВКА УСПЕШНО ЗАВЕРШЕНА**\n\n";
+        resultMessage += "Код выполнения: " + String(result) + "\n";
+        resultMessage += "Счетчик энкодера сброшен в 0\n";
+        resultMessage += "Нулевая позиция установлена";
+
+        Serial.println("Хоуминг успешно завершен с кодом: " + String(result));
+    } else {
+        resultMessage = "❌ **ОШИБКА КАЛИБРОВКИ**\n\n";
+        resultMessage += "Код ошибки: " + String(result) + "\n";
+
+        // Детализируем ошибку по коду
+        switch (result) {
+            case -1:
+                resultMessage += "• Таймаут выполнения (10 секунд)\n";
+                resultMessage += "• Мотор не достиг упора\n";
+                break;
+            case -2:
+                resultMessage += "• Мотор не начал движение\n";
+                resultMessage += "• Проверьте питание и соединения\n";
+                break;
+            case -3:
+                resultMessage += "• Ошибка энкодера\n";
+                resultMessage += "• Проверьте датчик положения\n";
+                break;
+            default:
+                resultMessage += "• Неизвестная ошибка\n";
+                break;
+        }
+
+        resultMessage += "\nПроверьте:\n";
+        resultMessage += "1. Свободный ход мотора\n";
+        resultMessage += "2. Соединение энкодера\n";
+        resultMessage += "3. Наличие упора для хоуминга";
+
+        Serial.println("Хоуминг завершился с ошибкой: " + String(result));
+    }
+
+    // Обновляем статус окна после хоуминга
+    RecentData data = windowController.getRecentData();
+    resultMessage += "\n\n**Текущая позиция:** " + String(data.windowPosition) + "/9";
+
+    bot->sendMessage(chat_id, resultMessage, "");
 }
 
 void TelegramBot::sendStatusLog(String chat_id, WindowController& controller) {

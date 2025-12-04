@@ -19,4 +19,4 @@ int get_current_position_index();
 void motor_test();
 
 void resetEncoderVelocityCalculation();
-bool performHoming(int homingDirection);
+int performHoming(int homingDirection);

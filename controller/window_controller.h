@@ -149,7 +149,7 @@ private:
 public:
     // unsigned get_encoder("");
     void setMode(WindowMode newMode);
-    bool setManualPosition(int position);
+    int setManualPosition(int position);
     void updateRecentData();
     WindowController() = default;
     void update();

@@ -27,16 +27,15 @@ void WindowController::setMode(WindowMode newMode) {
 
 // работа с датчиками и мотором =================================================================================================//
 
-bool WindowController::setManualPosition(int position) {
+int WindowController::setManualPosition(int position) {
     if (config.currentMode != WindowMode::MANUAL) {
         Serial.println("Warning: Setting manual position while not in MANUAL mode");
     }
     position = constrain(position, 0, POSITION_LEVELS - 1);
     Serial.print("MANUAL: Setting position to ");
     Serial.println(position);
-    return (bool)change_pos(position);
+    return change_pos(position);
 }
-
 
 float WindowController::getCurrentPosition() const {
     return get_current_position_index() / (float)POSITION_LEVELS;
