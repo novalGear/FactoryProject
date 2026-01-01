@@ -319,11 +319,11 @@ int get_current_position_index() {
 // HOMING =======================================================================================================================//
 
 // Добавьте эти константы в начало файла после других констант
-const int HOMING_DIR = 1;                   // направлени хоуминга
-const int HOMING_SPEED = 150;               // Скорость хоуминга (0-255)
-const int HOMING_MIN_VELOCITY = 130;        // Минимальная скорость энкодера для остановки хоуминга
-const unsigned long HOMING_TIMEOUT_MS = 15000;  // Таймаут хоуминга 10 секунд
-const unsigned long VELOCITY_SAMPLE_PERIOD = 100;  // Период измерения скорости (мс)
+const int HOMING_DIR = 1;                           // направлени хоуминга
+const int HOMING_SPEED = 150;                       // Скорость хоуминга (0-255)
+const int HOMING_MIN_VELOCITY = 180;                // Минимальная скорость энкодера для остановки хоуминга
+const unsigned long HOMING_TIMEOUT_MS = 15000;      // Таймаут хоуминга 10 секунд
+const unsigned long VELOCITY_SAMPLE_PERIOD = 100;   // Период измерения скорости (мс)
 
 // Добавьте глобальные переменные для расчета скорости
 unsigned long lastEncoderSampleTime = 0;
@@ -412,7 +412,7 @@ int performHoming() {
 
     // Даем мотору больше времени на разгон в закрепленной конструкции
     Serial.println("Waiting for motor to start...");
-    delay(1000); // Увеличиваем до 1 секунды для разгона
+    delay(2000); // Увеличиваем до 1 секунды для разгона
 
     bool homingSuccessful = false;
     bool timeoutReached = false;

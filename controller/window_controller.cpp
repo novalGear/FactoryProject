@@ -281,7 +281,7 @@ void WindowController::make_decision_auto_ST(unsigned long currentTime, float cu
     updateRecentData();
 
     // Получаем текущую позицию
-    int currentPosition = recentData.windowPosition;  // ДОБАВИТЬ ЭТУ СТРОКУ!
+    int currentPosition = recentData.windowPosition;
 
     // 1. Рассчитываем "полезность" открытия и закрытия
     float openBenefit = 0.0f;

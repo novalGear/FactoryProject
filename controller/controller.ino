@@ -24,26 +24,21 @@ void setup() {
     menu_setup();               // обязательно после сенсоров и дисплея
 
 
+    // первоначальная нормировка положения мотора
     performHoming();
     stop_motor();
 }
 
 void loop() {
-    // static unsigned long last_print = 0;
-    // if (millis() - last_print > 100 ) {
-    //     Serial.println(get_encoder());
-    //     last_print = millis();
-    // }
-    // return;
     windowController.update();
     updateDisplay();            // здесь обновляем данные для дисплея
     display_regular_update();   // здесь с фиксированной частотой посылаем новые данные на дисплей
 
+    // запросы на read на датчики
     buttons_update();
     temperature_sensors_update();
     co2_sensor_update();
 
-    // telegramBot.loop();
     telegramBot.update(windowController);
     // delay(5000); // Основной цикл каждые 5 секунд
 }
